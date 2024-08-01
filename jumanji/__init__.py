@@ -140,3 +140,7 @@ register(id="PacMan-v1", entry_point="jumanji.environments:PacMan")
 register(
     id="SlidingTilePuzzle-v0", entry_point="jumanji.environments:SlidingTilePuzzle"
 )
+# Separation train sequencing
+register(
+    id="Distillation-v0", entry_point="jumanji.environments:Distillation"
+)

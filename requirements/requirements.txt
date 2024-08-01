@@ -7,3 +7,4 @@ matplotlib~=3.7.4
 numpy>=1.19.5
 Pillow>=9.0.0
 typing-extensions>=4.0.0
+jaxopt==0.8.3

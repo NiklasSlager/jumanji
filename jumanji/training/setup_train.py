@@ -45,6 +45,7 @@ from jumanji.environments import (
     Sokoban,
     Sudoku,
     Tetris,
+    Distillation,
 )
 from jumanji.training import networks
 from jumanji.training.agents.a2c import A2CAgent
@@ -210,6 +211,9 @@ def _setup_random_policy(  # noqa: CCR001
     elif cfg.env.name == "pac_man":
         assert isinstance(env.unwrapped, PacMan)
         random_policy = networks.make_random_policy_pacman()
+    elif cfg.env.name == "distillation":
+        assert isinstance(env.unwrapped, Distillation)
+        random_policy = networks.make_random_policy_distillation()
     else:
         raise ValueError(f"Environment name not found. Got {cfg.env.name}.")
     return random_policy
@@ -417,6 +421,15 @@ def _setup_actor_critic_neworks(  # noqa: CCR001
             num_channels=cfg.env.network.num_channels,
             policy_layers=cfg.env.network.policy_layers,
             value_layers=cfg.env.network.value_layers,
+        )
+    elif cfg.env.name == "distillation":
+        assert isinstance(env.unwrapped, Distillation)
+        actor_critic_networks = networks.make_actor_critic_networks_distillation(
+            distillation=env.unwrapped,
+            transformer_num_blocks=cfg.env.network.transformer_num_blocks,
+            transformer_num_heads=cfg.env.network.transformer_num_heads,
+            transformer_key_size=cfg.env.network.transformer_key_size,
+            transformer_mlp_units=cfg.env.network.transformer_mlp_units,
         )
     else:
         raise ValueError(f"Environment name not found. Got {cfg.env.name}.")

@@ -124,7 +124,7 @@ def update_NR(state: State):
     f = vmap(f_sol, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
                                                          state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
     dx = jnp.nan_to_num(functions.thomas(a, b, c, -1 * f, state.Nstages))  # .reshape(-1,1)
-
+    
     def min_res(t, state: State, dx):
         dx_v = dx[:, :len(state.components)].transpose()
         dx_l = dx[:, -len(state.components):].transpose()
@@ -244,6 +244,23 @@ def reboiler_duty(state: State):
                          CD=state.CD + CD)
 
 
+def test_simulation(state, nstages, feedstage, pressure, feed, z, distillate, rr, analytics=False, specs=False,
+                      heavy_recovery=jnp.array(0.99, dtype=float), light_recovery=jnp.array(0.99, dtype=float)):
+    iterations = 0
+    res = 0
+    # feedstage = jnp.floor((nstages + 1) / 2 )
+    # state = initialize()
+
+    state = initial_guess(state=state, nstages=nstages, feedstage=feedstage, pressure=pressure, feed=feed, z=z,
+                          distillate=distillate, rr=rr, analytics=analytics, specs=specs, heavy_recovery=heavy_recovery,
+                          light_recovery=light_recovery)
+
+    state = initial_temperature(state)
+    state = state.replace(Hfeed=jnp.where(state.F > 0, jnp.sum(thermodynamics.feed_enthalpy(state) * state.z), 0))
+
+
+    return state, iterations, res
+
 def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, rr, analytics=False, specs=False,
                       heavy_recovery=jnp.array(0.99, dtype=float), light_recovery=jnp.array(0.99, dtype=float)):
     iterations = 0
@@ -258,8 +275,8 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     state = initial_temperature(state)
 
     state = state.replace(Hfeed=jnp.where(state.F > 0, jnp.sum(thermodynamics.feed_enthalpy(state) * state.z), 0))
-    state = state.replace(X=(jnp.ones(len(state.temperature))[:, None]*state.z).transpose())
-    # state = functions.y_func(state)
+    #state = state.replace(X=(jnp.ones(len(state.temperature))[:, None]*state.z).transpose())
+    state = functions.y_func(state)
 
     '''
     def for_body(state, i):
@@ -267,7 +284,7 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
 
     state, _ = jax.lax.scan(for_body, state, jnp.arange(3))
     '''
-    #state = initial_composition.bubble_point(state)
+    state = initial_composition.bubble_point(state)
 
     state, iterations, res = converge_column(state)
     state = state.replace(

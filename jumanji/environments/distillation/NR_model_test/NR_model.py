@@ -12,7 +12,7 @@ import os
 
 def initialize():
     n_max = 100
-    c_max = 3
+    c_max = 8
     dir = os.path.join(os.getcwd(), 'Pure component parameters')
     # psat_params, cpvap_params, hvap_params, hform_params = thermodynamics.retrieve_params(dir)
     return State(
@@ -88,7 +88,7 @@ def initial_guess(state: State, nstages, feedstage, pressure, feed, z, distillat
         pressure=pressure,
         F=f,
         Nstages=nstages,
-        components=jnp.array([2, 3, 4], dtype=int),  #jnp.arange(len(z)),  #
+        components=jnp.arange(len(z)),  #jnp.array([2, 3, 4], dtype=int),  #
         heavy_key=jnp.zeros((), dtype=int),  #jnp.where(specs == True, fug_state.heavy_key, jnp.zeros((), dtype=int)),
         light_key=jnp.zeros((), dtype=int),  #jnp.where(specs == True, fug_state.light_key, jnp.zeros((), dtype=int)),
         heavy_spec=heavy_recovery,

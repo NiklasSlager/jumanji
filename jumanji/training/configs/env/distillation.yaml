@@ -11,7 +11,7 @@ training:
     num_epochs: 5000
     num_learner_steps_per_epoch: 1
     n_steps: 2
-    total_batch_size: 12
+    total_batch_size: 16
 
 evaluation:
     eval_total_batch_size: 1

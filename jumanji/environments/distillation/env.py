@@ -198,7 +198,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         """
 
         grid = specs.BoundedArray(
-            shape=(4,),
+            shape=(9,),
             minimum=0.0,
             maximum=1.0,
             dtype=float,

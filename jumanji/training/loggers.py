@@ -188,7 +188,7 @@ class TensorboardLogger(Logger):
         super().__init__(save_checkpoint=save_checkpoint)
         if name:
             logging.info(name)
-        self.writer = tensorboardX.SummaryWriter(logdir=name)
+        self.writer = tensorboardX.SummaryWriter(logdir=name + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         self._env_steps = 0.0
 
     def write(

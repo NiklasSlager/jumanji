@@ -2,17 +2,16 @@ name: distillation
 registered_version: Distillation-v0
 
 network:
-    transformer_num_blocks: 4
-    transformer_num_heads: 16
-    transformer_key_size: 32
-    transformer_mlp_units: [1024]
+    transformer_num_blocks: 2
+    transformer_num_heads: 4
+    transformer_key_size: 16
+    transformer_mlp_units: [256]
 
 training:
     num_epochs: 5000
     num_learner_steps_per_epoch: 8
-    n_steps: 2
-    total_batch_size: 16
-
+    n_steps: 16
+    total_batch_size: 32
 evaluation:
     eval_total_batch_size: 8
     greedy_eval_total_batch_size: 8
@@ -23,5 +22,5 @@ a2c:
     bootstrapping_factor: 0.85
     l_pg: 1.0
     l_td: 1.0
-    l_en: 0.3
+    l_en: 0.2
     learning_rate: 1e-4

@@ -14,8 +14,8 @@ training:
     total_batch_size: 16
 
 evaluation:
-    eval_total_batch_size: 1
-    greedy_eval_total_batch_size: 1
+    eval_total_batch_size: 8
+    greedy_eval_total_batch_size: 8
 
 a2c:
     normalize_advantage: False

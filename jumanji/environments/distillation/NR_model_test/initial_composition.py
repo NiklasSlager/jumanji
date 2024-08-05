@@ -1,8 +1,7 @@
 import chex
 import jax.numpy as jnp
-import lineax
 import jax
-from jax import vmap
+from jax import vmap, scipy
 from jumanji.environments.distillation.NR_model_test.distillation_types import State
 from jumanji.environments.distillation.NR_model_test import functions
 from jumanji.environments.distillation.NR_model_test import thermodynamics as thermo
@@ -48,10 +47,10 @@ def solve_x(state, component):
     def matvec(x):
         return jnp.dot(massmatrix(state, component), x)
     b = bij(state, component)
-    matrix = massmatrix(state, component)
-    solution = lineax.linear_solve(lineax.MatrixLinearOperator(massmatrix(state, component)), b, solver=lineax.QR()).value
-    #return jnp.where(component > 0, jax.scipy.linalg.solve(massmatrix(state, component), b), 0)
-    return jnp.where(component > 0, solution, 0)
+    #matrix = massmatrix(state, component)
+    #solution = lineax.linear_solve(lineax.MatrixLinearOperator(massmatrix(state, component)), b, solver=lineax.QR()).value
+    return jnp.where(component > 0, jax.scipy.linalg.solve(massmatrix(state, component), b), 0)
+    #return jnp.where(component > 0, solution, 0)
 
 
 

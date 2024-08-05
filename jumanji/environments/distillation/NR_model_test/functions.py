@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 import jax.lax
-from jax import vmap
+from jax import vmap, scipy
 from jaxopt import Bisection
 from jumanji.environments.distillation.NR_model_test.distillation_types import State, Tray, Trays
 from jumanji.environments.distillation.NR_model_test import thermodynamics
@@ -54,14 +54,14 @@ def thomas(a, b, c, f, n_stages):
     n = len(f)
     u = jnp.zeros_like(f)
 
-    u = u.at[0].set(jnp.linalg.solve(b[0], f[0]))
-    c = c.at[0].set(jnp.linalg.solve(b[0], c[0]))
+    u = u.at[0].set(scipy.linalg.solve(b[0], f[0]))
+    c = c.at[0].set(scipy.linalg.solve(b[0], c[0]))
 
     def for_body_forward(carry, i):
         a, b, c, u, f = carry
-        c = c.at[i].set(jnp.linalg.solve(b[i] - jnp.matmul(a[i - 1], c[i - 1]), c[i]))
+        c = c.at[i].set(scipy.linalg.solve(b[i] - jnp.matmul(a[i - 1], c[i - 1]), c[i]))
         u = u.at[i].set(
-            jnp.linalg.solve(b[i] - jnp.matmul(a[i - 1], c[i - 1]), f[i] - jnp.matmul(a[i - 1], u[i - 1])))
+            scipy.linalg.solve(b[i] - jnp.matmul(a[i - 1], c[i - 1]), f[i] - jnp.matmul(a[i - 1], u[i - 1])))
         return (a, b, c, u, f), i
     carry, add = jax.lax.scan(for_body_forward, (a, b, c, u, f), jnp.arange(1, len(f)))
     a, b, c, u, f = carry

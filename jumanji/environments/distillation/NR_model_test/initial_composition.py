@@ -1,5 +1,6 @@
 import chex
 import jax.numpy as jnp
+import lineax
 import jax
 from jax import vmap
 from jumanji.environments.distillation.NR_model_test.distillation_types import State
@@ -28,7 +29,7 @@ def massmatrix(state, component):
     aj_values = jnp.where(jnp.arange(1, len(state.L)) < state.Nstages, aj_values, 0)
 
     bj_values = vmap(get_bj, in_axes=[None, None, 0])(state, component, jnp.arange(0, len(state.L)))
-    bj_values = jnp.where(jnp.arange(0, len(state.L)) < state.Nstages, bj_values, 0)
+    bj_values = jnp.where(jnp.arange(0, len(state.L)) < state.Nstages, bj_values, 1)
 
     cj_values = vmap(get_cj, in_axes=[None, None, 0])(state, component, jnp.arange(0, len(state.L) - 1))
     cj_values = jnp.where(jnp.arange(0, len(state.L) - 1) < state.Nstages-1, cj_values, 0)
@@ -47,9 +48,11 @@ def solve_x(state, component):
     def matvec(x):
         return jnp.dot(massmatrix(state, component), x)
     b = bij(state, component)
-    #chex.assert_shape(massmatrix(state, component), (30, 30))
-    #chex.assert_shape(b, (30, ))
-    return jnp.where(component > 0, jnp.linalg.solve(massmatrix(state, component), b), 0)
+    matrix = massmatrix(state, component)
+    solution = lineax.linear_solve(lineax.MatrixLinearOperator(massmatrix(state, component)), b, solver=lineax.QR()).value
+    #return jnp.where(component > 0, jax.scipy.linalg.solve(massmatrix(state, component), b), 0)
+    return jnp.where(component > 0, solution, 0)
+
 
 
 def model_solver(state: State):

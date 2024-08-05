@@ -3,10 +3,10 @@ from jumanji.environments.distillation.NR_model_test.distillation_types import S
 
 def diameter(state: State, l_s):
     r_gas = 8.314
-    #mw_series = jnp.array([16.04, 30.07, 44.097, 58.12, 72.15, 72.15, 100.21, 114.23])
-    #rho_series = jnp.array([422.6, 544.0, 493.0, 625.0, 626.0, 616.0, 670.0, 690.0])
-    mw_series = jnp.array([44.097, 58.12, 72.15])
-    rho_series = jnp.array([493.0, 625.0, 626.0])
+    mw_series = jnp.array([16.04, 30.07, 44.097, 58.12, 72.15, 72.15, 100.21, 114.23])
+    rho_series = jnp.array([422.6, 544.0, 493.0, 625.0, 626.0, 616.0, 670.0, 690.0])
+    #mw_series = jnp.array([44.097, 58.12, 72.15])
+    #rho_series = jnp.array([493.0, 625.0, 626.0])
     rho_v = jnp.where(jnp.sum(state.Y, axis=0) > 0, (state.pressure * 1e5 / (r_gas * state.temperature)*jnp.sum(state.Y*mw_series[:, None], axis=0))/1000, 0)
     rho_l = jnp.sum(state.X*rho_series[:, None], axis=0)
 

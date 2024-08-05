@@ -3,7 +3,7 @@ registered_version: Distillation-v0
 
 network:
     transformer_num_blocks: 4
-    transformer_num_heads: 12
+    transformer_num_heads: 16
     transformer_key_size: 32
     transformer_mlp_units: [1024]
 

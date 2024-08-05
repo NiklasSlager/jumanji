@@ -9,7 +9,7 @@ network:
 
 training:
     num_epochs: 5000
-    num_learner_steps_per_epoch: 1
+    num_learner_steps_per_epoch: 8
     n_steps: 2
     total_batch_size: 16
 

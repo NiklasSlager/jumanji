@@ -38,8 +38,8 @@ def massmatrix(state, component):
 
 def bij(state, j):
     #indexes = jnp.arange(len(state.components))
-    component = jnp.where(j == 2, 0, jnp.where(j == 3, 1, 2))
-    #component=j
+    #component = jnp.where(j == 2, 0, jnp.where(j == 3, 1, 2))
+    component=j
     return -state.z[component] * state.F
 
 

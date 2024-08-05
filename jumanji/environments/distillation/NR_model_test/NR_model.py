@@ -276,7 +276,7 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
 
     state = state.replace(Hfeed=jnp.where(state.F > 0, jnp.sum(thermodynamics.feed_enthalpy(state) * state.z), 0))
     #state = state.replace(X=(jnp.ones(len(state.temperature))[:, None]*state.z).transpose())
-    state = functions.y_func(state)
+    #state = functions.y_func(state)
 
     '''
     def for_body(state, i):
@@ -285,7 +285,7 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     state, _ = jax.lax.scan(for_body, state, jnp.arange(3))
     '''
     state = initial_composition.bubble_point(state)
-
+    
     state, iterations, res = converge_column(state)
     state = state.replace(
         Hliq=jnp.sum(vmap(thermodynamics.liquid_enthalpy, in_axes=(0, None))(state.temperature,

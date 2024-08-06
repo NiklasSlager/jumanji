@@ -141,7 +141,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
         next_state = self._stream_table_update(state, column_state, action, iterator)
         next_state = self._get_action_mask_stream(next_state)
-        reward = jnp.sum(next_state.stream.value[:, state.step_count])
+        reward = jnp.sum(jnp.nan_to_num(next_state.stream.value[:, state.step_count]))
         next_state = next_state.replace(
             step_count=jnp.where(column_state.converged==1, state.step_count + 1, state.step_count),
             key=N_key,

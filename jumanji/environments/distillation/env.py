@@ -74,8 +74,9 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))
         action_mask = jnp.array(
-            (jnp.concatenate((jnp.ones(50, dtype=bool), jnp.zeros(50, dtype=bool))),
+            (#jnp.concatenate((jnp.ones(50, dtype=bool), jnp.zeros(50, dtype=bool))),
              #jnp.concatenate((jnp.ones(65, dtype=bool), jnp.zeros(35, dtype=bool))),
+             jnp.ones(100),
              jnp.ones(100),
              jnp.ones(100)
              ))

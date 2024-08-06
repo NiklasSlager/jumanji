@@ -38,7 +38,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             pressure_bound: Tuple[float, float] = (1, 10),
             reflux_bound: Tuple[float, float] = (0.01, 10),
             distillate_bound: Tuple[float, float] = (0.010, 0.990),
-            step_limit: int = 6,
+            step_limit: int = 8,
     ):
         """Instantiates a `Snake` environment.
 

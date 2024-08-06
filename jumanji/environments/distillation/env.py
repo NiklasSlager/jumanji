@@ -108,7 +108,8 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                                    "action_C2.1": state.stream.flows[-1, 2, 0],
                                    "action_C2.2": state.stream.flows[-1, 2, 1],
                                    "action_C2.3": state.stream.flows[-1, 2, 2],
-                                   "nr_products": jnp.sum(state.stream.isproduct[:, -1]),
+                                   "nr_products": jnp.sum(jnp.any(state.stream.isproduct)*done),
+                                   "nr_columns": jnp.sum(jnp.any(state.stream.isproduct==1, axis=0)*done),
                                    "iterations": jnp.zeros((), dtype=int),
                                    "converged": jnp.zeros((), dtype=bool),
                                    "outflow": jnp.zeros((), dtype=float),
@@ -167,10 +168,11 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                   "action_C2.1": next_state.stream.action[-1, -1, 0],
                   "action_C2.2": next_state.stream.action[-1, -1, 1],
                   "action_C2.3": next_state.stream.action[-1, -1, 2],
-                  "nr_products": jnp.sum(next_state.stream.isproduct[:, -1]),
+                  "nr_products": jnp.sum(jnp.any(next_state.stream.isproduct==1, axis=1)*done),
+                  "nr_columns": jnp.sum(jnp.any(next_state.stream.isproduct==1, axis=0)*done),
                   "iterations": iterator,
                   "converged": column_state.converged,
-                  "outflow": jnp.sum(next_state.stream.flows[:,-1,:]*next_state.stream.isproduct[:, -1, None])
+                  "outflow": jnp.sum(next_state.stream.flows[:,state.step_count,:]*next_state.stream.isproduct[:, state.step_count, None])
                   }
         timestep = jax.lax.cond(
             done,

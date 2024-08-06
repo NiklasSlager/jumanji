@@ -388,12 +388,13 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         )
 
     def _get_action_mask_stream(self, state: State):
+        step = state.step_count - (1-any(state.stream.converged[:, state.step_count]))
         step_mask = jnp.where((jnp.any(state.stream.isproduct, axis=1) == 0)
-                              & (jnp.triu(jnp.ones(state.action_mask_stream.shape, dtype=bool))[:, state.step_count]),
+                              & (jnp.triu(jnp.ones(state.action_mask_stream.shape, dtype=bool))[:, step]),
                               jnp.arange(1, len(state.stream.flows) + 1),
                               10)
         return state.replace(
-            action_mask_stream=jnp.zeros_like(state.action_mask_stream).at[:, state.step_count].set(
+            action_mask_stream=jnp.zeros_like(state.action_mask_stream).at[:, step].set(
                 jnp.array(jnp.where(step_mask == jnp.min(step_mask), 1, 0), dtype=bool))
         )
 

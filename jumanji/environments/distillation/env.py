@@ -139,7 +139,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             rr=column_input.reflux_ratio
         )
 
-        next_state = self._stream_table_update(state, column_state, action)
+        next_state = self._stream_table_update(state, column_state, action, iterator)
         next_state = self._get_action_mask_stream(next_state)
         reward = jnp.sum(next_state.stream.value[:, state.step_count])
         next_state = next_state.replace(
@@ -311,7 +311,8 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             pressure=jnp.zeros((matsize, matsize)),
             stages=jnp.zeros((matsize, matsize)),
             converged=jnp.zeros((matsize, matsize)),
-            action=jnp.zeros((matsize, matsize, 3))
+            action=jnp.zeros((matsize, matsize, 3)),
+            iterations=jnp.zeros((matsize, matsize)),
         )
 
 
@@ -319,7 +320,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         return ((jnp.max(mole_flow / jnp.sum(mole_flow)) > 0.95) | (jnp.sum(mole_flow) < 10)) & converged == True
 
 
-    def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array):
+    def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array, iterator: chex.Array):
         product_prices = (jnp.arange(len(column_state.components)) * 1 + 5) / 150
 
         state = state.replace(stream=state.stream.replace(
@@ -368,12 +369,15 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             stages=state.stream.stages.at[
                       jnp.int32(jnp.min(indices)), state.step_count].set(column_state.Nstages).at[
                       jnp.int32(jnp.max(indices)), state.step_count].set(column_state.Nstages),
-            converged=state.stream.stages.at[
+            converged=state.stream.converged.at[
                       jnp.int32(jnp.min(indices)), state.step_count].set(column_state.converged).at[
                       jnp.int32(jnp.max(indices)), state.step_count].set(column_state.converged),
             action=state.stream.action.at[
                 jnp.int32(jnp.min(indices)), state.step_count].set(action).at[
                 jnp.int32(jnp.max(indices)), state.step_count].set(action),
+            iterations=state.stream.iterations.at[
+                jnp.int32(jnp.min(indices)), state.step_count].set(iterator).at[
+                jnp.int32(jnp.max(indices)), state.step_count].set(iterator),
 
         )
 

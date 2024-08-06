@@ -266,7 +266,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         #action_RR = action % 2500 // 50
         #action_D = action % 50
 
-        new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 99]), jnp.array(self._stage_bounds)))
+        new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 95]), jnp.array(self._stage_bounds)))
         #new_P = jnp.interp(action_P, jnp.array([0, 10]), jnp.array(self._pressure_bounds))
         new_RR = jnp.interp(action_RR, jnp.array([0, 99]), jnp.array(self._reflux_bounds))
         new_D = jnp.interp(action_D, jnp.array([0, 99]), jnp.array(self._distillate_bounds))

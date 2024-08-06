@@ -34,11 +34,11 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
     def __init__(
             self,
-            stage_bound: Tuple[int, int] = (5, 104),
+            stage_bound: Tuple[int, int] = (5, 100),
             pressure_bound: Tuple[float, float] = (1, 10),
             reflux_bound: Tuple[float, float] = (0.01, 10),
             distillate_bound: Tuple[float, float] = (0.010, 0.990),
-            step_limit: int = 2,
+            step_limit: int = 8,
     ):
         """Instantiates a `Snake` environment.
 
@@ -74,9 +74,8 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))
         action_mask = jnp.array(
-            (#jnp.concatenate((jnp.ones(50, dtype=bool), jnp.zeros(50, dtype=bool))),
+            (jnp.concatenate((jnp.ones(96, dtype=bool), jnp.zeros(4, dtype=bool))),
              #jnp.concatenate((jnp.ones(65, dtype=bool), jnp.zeros(35, dtype=bool))),
-             jnp.ones(100),
              jnp.ones(100),
              jnp.ones(100)
              ))
@@ -267,7 +266,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         #action_RR = action % 2500 // 50
         #action_D = action % 50
 
-        new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 49]), jnp.array(self._stage_bounds)))
+        new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 99]), jnp.array(self._stage_bounds)))
         #new_P = jnp.interp(action_P, jnp.array([0, 10]), jnp.array(self._pressure_bounds))
         new_RR = jnp.interp(action_RR, jnp.array([0, 99]), jnp.array(self._reflux_bounds))
         new_D = jnp.interp(action_D, jnp.array([0, 99]), jnp.array(self._distillate_bounds))

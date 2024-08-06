@@ -34,7 +34,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
     def __init__(
             self,
-            stage_bound: Tuple[int, int] = (5, 54),
+            stage_bound: Tuple[int, int] = (5, 104),
             pressure_bound: Tuple[float, float] = (1, 10),
             reflux_bound: Tuple[float, float] = (0.01, 10),
             distillate_bound: Tuple[float, float] = (0.010, 0.990),

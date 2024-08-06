@@ -40,6 +40,7 @@ class StreamSpec:
 class State:
     stream: StreamSpec
     step_count: chex.Numeric  # ()
+    column_count: chex.Numeric
     action_mask_stream: chex.Array  # (4,)
     action_mask_column: chex.Array
     key: chex.PRNGKey  # (2,)

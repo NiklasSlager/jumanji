@@ -126,7 +126,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         feed = jnp.sum(feed_flow)
         z = feed_flow / jnp.sum(feed_flow)
 
-        init_column = jax.jit(initialize)()
+        init_column = initialize()
         column_state, iterator, res = simulation(
             state=init_column,
             nstages=jnp.int32(column_input.n_stages),

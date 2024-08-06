@@ -34,7 +34,7 @@ class StreamSpec:
     stages: chex.Array
     converged: chex.Array
     action: chex.Array
-    
+    iterations: chex.Array
     
 @dataclass
 class State:

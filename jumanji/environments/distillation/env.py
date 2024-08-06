@@ -127,6 +127,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         z = feed_flow / jnp.sum(feed_flow)
 
         init_column = initialize()
+        '''
         column_state, iterator, res = simulation(
             state=init_column,
             nstages=jnp.int32(column_input.n_stages),
@@ -137,7 +138,9 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             distillate=column_input.distillate * feed,
             rr=column_input.reflux_ratio
         )
-
+        '''
+        column_state = init_column
+        iterator = jnp.zeros((), dtype=int)
         next_state = self._stream_table_update(state, column_state, action, iterator)
         next_state = self._get_action_mask_stream(next_state)
         reward = jnp.sum(jnp.nan_to_num(next_state.stream.value[:, state.step_count]))
@@ -388,7 +391,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         )
 
     def _get_action_mask_stream(self, state: State):
-        step = state.step_count - (1-jnp.any(state.stream.converged[:, state.step_count]))
+        step = state.step_count - jnp.array((1-jnp.max(state.stream.converged[:, state.step_count])), dtype=int)
         step_mask = jnp.where((jnp.any(state.stream.isproduct, axis=1) == 0)
                               & (jnp.triu(jnp.ones(state.action_mask_stream.shape, dtype=bool))[:, step]),
                               jnp.arange(1, len(state.stream.flows) + 1),

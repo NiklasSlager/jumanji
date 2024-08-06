@@ -89,12 +89,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         )
         # output = simulation(N_reset)
         reward = jnp.array(-50, dtype=float)
-        timestep = restart(observation=self._state_to_observation(state),
-                           extras={"reward": jnp.zeros((), dtype=int),
-                                   "converged": jnp.zeros((), dtype=int),
-                                   "outflow": jnp.zeros((), dtype=float),
-                                   })
-        '''
+
         timestep = restart(observation=self._state_to_observation(state),
                            extras={"reward": reward,
                                    "stages_C1": jnp.zeros_like(state.stream.stages[0,0]), "stages_C2": jnp.zeros_like(state.stream.stages[0,0]),
@@ -120,7 +115,6 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                                    "converged": jnp.zeros((), dtype=bool),
                                    "outflow": jnp.zeros((), dtype=float),
                                    })
-        '''
         return state, timestep
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep[Observation]]:
@@ -156,11 +150,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         done = (next_state.step_count >= self._max_steps+1) | jnp.all(state.stream.isproduct[:, next_state.step_count] == 1)
 
         observation = self._state_to_observation(next_state)
-        extras = {"reward": jnp.zeros((), dtype=int),
-                  "converged": jnp.zeros((), dtype=int),
-                  "outflow": jnp.zeros((), dtype=float),
-                  }
-        '''
+
         extras = {"reward": reward,
                   "stages_C1": next_state.stream.stages[0, 1], "stages_C2": next_state.stream.stages[2, 2],
                   "pressure_C1": next_state.stream.pressure[0, 1], "pressure_C2": next_state.stream.pressure[2, 2],
@@ -185,7 +175,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                   "converged": column_state.converged,
                   "outflow": jnp.sum(next_state.stream.flows[:,state.step_count,:]*next_state.stream.isproduct[:, state.step_count, None])
                   }
-                  '''
+
                   
         timestep = jax.lax.cond(
             done,

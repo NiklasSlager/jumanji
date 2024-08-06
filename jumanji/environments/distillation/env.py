@@ -69,7 +69,8 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                 environment.
         """
 
-        feed = jnp.array([0., 0.2, 0.2, 0.2, 0.2, 0.2, 0., 0.2], dtype=float) * jnp.array(1000., dtype=float)
+        feed = jnp.array([0., 0.2, 0.2, 0.2, 0.2, 0.2, 0., 0.2], dtype=float) 
+        feed = feed/jnp.sum(feed) * jnp.array(1000., dtype=float)
 
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))
@@ -108,8 +109,8 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                                    "action_C2.1": state.stream.flows[-1, 2, 0],
                                    "action_C2.2": state.stream.flows[-1, 2, 1],
                                    "action_C2.3": state.stream.flows[-1, 2, 2],
-                                   "nr_products": jnp.sum(jnp.any(state.stream.isproduct)*done),
-                                   "nr_columns": jnp.sum(jnp.any(state.stream.isproduct==1, axis=0)*done),
+                                   "nr_products": jnp.sum(jnp.any(state.stream.isproduct)),
+                                   "nr_columns": jnp.sum(jnp.any(state.stream.isproduct==1, axis=0)),
                                    "iterations": jnp.zeros((), dtype=int),
                                    "converged": jnp.zeros((), dtype=bool),
                                    "outflow": jnp.zeros((), dtype=float),

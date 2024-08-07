@@ -115,8 +115,9 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                                    "iterations": jnp.zeros((), dtype=int),
                                    "converged": jnp.zeros((), dtype=bool),
                                    "outflow": jnp.zeros((), dtype=float),
+
                                    })
-                                   
+
         return state, timestep
 
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep[Observation]]:
@@ -161,7 +162,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         done = (next_state.step_count >= self._max_steps) | jnp.min(state.stream.isproduct[:, next_state.column_count] == 1)
 
         observation = self._state_to_observation(next_state)
-        
+
         extras = {"reward": reward,
                   "stages_C1": next_state.stream.stages[0, 1], "stages_C2": next_state.stream.stages[2, 2],
                   "pressure_C1": next_state.stream.pressure[0, 1], "pressure_C2": next_state.stream.pressure[2, 2],
@@ -186,7 +187,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                   "converged": column_state.converged,
                   "outflow": jnp.sum(next_state.stream.flows[:,state.step_count,:]*next_state.stream.isproduct[:, state.step_count, None])
                   }
-                  
+
                   
         timestep = jax.lax.cond(
             done,
@@ -355,22 +356,18 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         bot_flow_isproduct = self._is_product_stream(bot_flow, converged)
         top_flow_isproduct = self._is_product_stream(top_flow, converged)
         feedflows = state.stream.flows[(jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), step]
+        real_flows = jnp.where(converged == True, jnp.array((top_flow, bot_flow)), feedflows)
+
         column_cost = jnp.where((jnp.abs(column_state.TAC) < 100.), jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F)), jnp.nan_to_num(-75./jnp.sum(column_state.F)))
         stream_table = state.stream.replace(
             flows=state.stream.flows.at[
                 (jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), step].set(
-                jnp.where(converged == True,
-                          jnp.array((top_flow, bot_flow)),
-                          feedflows)
+                real_flows
             ),
             value=state.stream.value.at[
                 (jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), step].set(
-                column_cost * jnp.sum(jnp.where(
-                    converged == True,
-                    jnp.array((top_flow, bot_flow)),
-                    feedflows), axis=1) +
-                jnp.array((top_flow_isproduct, bot_flow_isproduct)) * jnp.sum(
-                    jnp.array((top_flow, bot_flow)) * product_prices, axis=1),
+                column_cost * jnp.sum(real_flows, axis=1) +
+                jnp.sum(real_flows * product_prices, axis=1) * jnp.array([top_flow_isproduct, bot_flow_isproduct])
             ),
             isproduct=state.stream.isproduct.at[
                       jnp.int32(jnp.min(indices)), step].set(top_flow_isproduct).at[

@@ -42,6 +42,7 @@ class State:
     step_count: chex.Numeric  # ()
     column_count: chex.Numeric
     action_mask_stream: chex.Array  # (4,)
+    overall_stream_actions: chex.Array
     action_mask_column: chex.Array
     key: chex.PRNGKey  # (2,)
     

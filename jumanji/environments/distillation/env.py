@@ -145,13 +145,14 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             distillate=column_input.distillate * feed,
             rr=column_input.reflux_ratio
         )
+        column_state = column_state.replace(converged = jnp.where(jnp.isnan(column_state.converged), False, column_state.converged))
         '''
         column_state = init_column
         iterator = jnp.zeros((), dtype=int)
         '''
         next_state = self._stream_table_update(state, column_state, action, iterator)
         next_state = self._get_action_mask_stream(next_state)
-        reward = jnp.sum(jnp.nan_to_num(next_state.stream.value[:, state.column_count]))
+        reward = jnp.sum(jnp.nan_to_num(next_state.stream.value[:, state.column_count], nan=-75))
         converged = jnp.asarray(((jnp.sum(column_state.V[0]) > 0) & (column_state.converged == 1) & (iterator < 100)), dtype=int)
 
 

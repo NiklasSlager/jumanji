@@ -70,7 +70,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                 environment.
         """
 
-        feed = jnp.array([0., 0.1, 0.2, 0.25, 0.25, 0., 0.15, 0.1], dtype=float) 
+        feed = jnp.array([0., 0.1, 0.2, 0.25, 0.25, 0., 0.15, 0.1], dtype=float)
         feed = feed/jnp.sum(feed) * jnp.array(1000., dtype=float)
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))
@@ -85,6 +85,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             step_count=jnp.zeros((), dtype=int),
             column_count=jnp.ones((), dtype=int),
             action_mask_stream=jnp.zeros((self._max_steps+1, self._max_steps+1), dtype=bool).at[0, 0].set(True),
+            overall_stream_actions=jnp.zeros((self._max_steps + 1, self._max_steps + 1), dtype=bool).at[0, 0].set(True),
             action_mask_column=action_mask,
             key=jax.random.PRNGKey(0)  # (2,)
         )
@@ -110,12 +111,13 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                                    "action_C2.1": state.stream.flows[-1, 2, 0],
                                    "action_C2.2": state.stream.flows[-1, 2, 1],
                                    "action_C2.3": state.stream.flows[-1, 2, 2],
-                                   "nr_products": jnp.sum(jnp.any(state.stream.isproduct)),
-                                   "nr_columns": jnp.sum(jnp.any(state.stream.isproduct==1, axis=0)),
+                                   "nr_product_streams": jnp.sum(jnp.max(state.stream.isproduct, axis=1)),
+                                   "nr_columns": jnp.sum(state.overall_stream_actions),
                                    "iterations": jnp.zeros((), dtype=int),
                                    "converged": jnp.zeros((), dtype=bool),
                                    "outflow": jnp.zeros((), dtype=float),
-
+                                   #"action_mask": self._matrix_to_binary_integer(jnp.concatenate(jnp.int32(state.overall_stream_actions))),
+                                   #"product_mask": self._matrix_to_binary_integer(jnp.concatenate(state.stream.isproduct)),
                                    })
 
         return state, timestep
@@ -156,13 +158,16 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         next_state = next_state.replace(
             step_count=state.step_count + 1,
             column_count=state.column_count + converged,
+            overall_stream_actions=state.overall_stream_actions+next_state.action_mask_stream,
             key=N_key,
         )
 
-        done = (next_state.step_count >= self._max_steps) | jnp.min(state.stream.isproduct[:, next_state.column_count] == 1)
+        done = (next_state.step_count >= self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
 
         observation = self._state_to_observation(next_state)
 
+        #x_column, y_column, products, level_step = self._get_flowchart_configuration(state)
+        
         extras = {"reward": reward,
                   "stages_C1": next_state.stream.stages[0, 1], "stages_C2": next_state.stream.stages[2, 2],
                   "pressure_C1": next_state.stream.pressure[0, 1], "pressure_C2": next_state.stream.pressure[2, 2],
@@ -181,11 +186,13 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                   "action_C2.1": next_state.stream.action[-1, -1, 0],
                   "action_C2.2": next_state.stream.action[-1, -1, 1],
                   "action_C2.3": next_state.stream.action[-1, -1, 2],
-                  "nr_products": jnp.sum(jnp.any(next_state.stream.isproduct==1, axis=1)*done),
-                  "nr_columns": jnp.sum(jnp.any(next_state.stream.isproduct==1, axis=0)*done),
+                  "nr_product_streams": jnp.sum(jnp.max(next_state.stream.isproduct, axis=1)),
+                  "nr_columns": jnp.sum(next_state.overall_stream_actions),
                   "iterations": iterator,
                   "converged": column_state.converged,
-                  "outflow": jnp.sum(next_state.stream.flows[:,state.step_count,:]*next_state.stream.isproduct[:, state.step_count, None])
+                  "outflow": jnp.sum(jnp.max(next_state.stream.isproduct*jnp.sum(next_state.stream.flows, axis=2), axis=1)),
+                  #"action_mask": self._matrix_to_binary_integer(jnp.concatenate(jnp.int32(state.overall_stream_actions))),
+                  #"product_mask": self._matrix_to_binary_integer(jnp.concatenate(state.stream.isproduct)),
                   }
 
                   
@@ -405,7 +412,46 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                               10)
         return state.replace(
             action_mask_stream=jnp.zeros_like(state.action_mask_stream).at[:, step].set(
-                jnp.array(jnp.where(step_mask == jnp.min(step_mask), 1, 0), dtype=bool))
+                jnp.array(jnp.where((step_mask == jnp.min(step_mask)) & (jnp.min(step_mask) !=10), 1, 0), dtype=bool))
         )
 
 
+    def _get_flowchart_configuration(self, state: State):
+        action_mask = state.overall_stream_actions
+        product_mask = state.stream.isproduct
+
+        row_count = jnp.tile(jnp.arange(len(action_mask)), (len(action_mask), 1)).transpose() * action_mask
+        row_check = jnp.concatenate((jnp.array(0)[None], 2 ** jnp.arange(len(action_mask) - 1)))
+        row_repeat = jnp.repeat(row_check[:-1], row_check[1:])[:len(action_mask)]
+        initial_streams = jnp.triu(jnp.ones_like(action_mask)).at[0, 0].set(0)
+        x_column = jnp.arange(len(action_mask))
+        carry = action_mask, product_mask, row_repeat, jnp.max(row_count, axis=0), x_column, initial_streams
+        carry, _ = jax.lax.scan(self._stream_level_scan, carry, jnp.arange(len(action_mask)))
+        action_mask, product_mask, row_repeat, row_count, x_column, stream_levels = carry
+        
+        y_column = jnp.max(jnp.where(action_mask, stream_levels, 0), axis=0)[1:]
+        products = product_mask[x_column, jnp.max(jnp.where(action_mask, stream_levels, 0), axis=0)]
+        level_step = jnp.asarray(jnp.where(jnp.diff(x_column) - jnp.diff(row_count) == 1, 1, 0), dtype=float)
+        return x_column, y_column, products, level_step
+
+    def _stream_level_scan(self, carry, i):
+        action_mask, product_mask, row_repeat, row_count, x_column, streams = carry
+        product = jnp.concatenate((jnp.array(0)[None], jnp.diff(jnp.sum(product_mask, axis=0))))
+
+        column_repeat = jnp.arange(len(row_repeat))
+        correction = jnp.concatenate(
+            (jnp.array(0)[None], jnp.cumsum(jnp.diff(column_repeat) - jnp.diff(x_column))))
+        # x_column = jnp.where((row_count[i] == row_count[i-1]) | (product[i-1] == 2), column_repeat - jnp.sum(column_repeat-x_column), row_repeat)
+
+        row_repeat = row_repeat.at[i + 1].set(
+            jnp.where(((row_count[i] == row_count[i - 1]) | (product_mask[i - 1, i] == 1)),
+                      row_repeat[i], row_repeat[i + 1]))
+        x_column = x_column.at[i].set(jnp.where((row_count[i] == row_count[i - 1]) | (product_mask[i - 1, i] == 1),
+                                                column_repeat[i] - correction[i - 1], row_repeat[i]))
+        top_action = jnp.where(i == 0, False, action_mask[row_count[i], i] - action_mask[row_count[i], i - 1] == 0)
+        level_change = jnp.where(top_action, 1, 0)
+        row_level = jnp.where(jnp.arange(len(row_count)) > i, level_change, 0)
+        streams = streams.at[row_count[i]].set(streams[row_count[i]] + row_level)
+        streams = streams.at[i + 1].set(jnp.where(streams[i + 1] > 0, streams[row_count[i]], streams[i + 1]))
+        carry = action_mask, product_mask, row_repeat, row_count, x_column, streams
+        return carry, None

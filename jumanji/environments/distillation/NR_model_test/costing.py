@@ -15,7 +15,7 @@ def diameter(state: State, l_s):
     csb = ((0.26 * l_s - 0.029 * l_s ** 2)/(1 + 6 * f_flow ** 2 * l_s ** 0.7498) ** 0.5)/3.38084
     u_nf = jnp.nan_to_num(csb * (0.015/0.02)**0.2 * jnp.sqrt((rho_l - rho_v)/rho_v))
     a_n = jnp.nan_to_num((state.V/3.6 * jnp.sum(state.Y*mw_series[:, None], axis=0)/1000)/rho_v / (0.85 * u_nf))
-    diameter = 2 * jnp.sqrt(a_n/(jnp.pi * (1-jnp.asin(0.77)/90) + 2 * 0.77 * jnp.cos(jnp.asin(0.77))))
+    diameter = 2 * jnp.sqrt(a_n/(jnp.pi * (1-jnp.arcsin(0.77)/90) + 2 * 0.77 * jnp.cos(jnp.arcsin(0.77))))
 
     #u_sup = jnp.where(jnp.sum(state.Y, axis=0) > 0, (-0.171 * l_s**2 + 0.27 * l_s - 0.047)*((rho_l-rho_v)/rho_v)**0.5, 0)
     #d_eff = jnp.sqrt(4*jnp.max(state.V/3.6*state.Y*mw_series[:, None]/1000)/(jnp.pi*rho_v*u_sup))

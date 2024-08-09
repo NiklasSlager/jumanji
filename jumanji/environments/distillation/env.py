@@ -310,7 +310,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         flows = jnp.sum(state.stream.flows[:, state.column_count-1]*state.action_mask_stream[:, state.column_count-1][:, None], axis=0)
 
         return Observation(
-            grid=jnp.concatenate((flows/jnp.sum(flows), jnp.array([jnp.sum(flows)/jnp.array(1000., dtype=float)]))),
+            grid=jnp.nan_to_num(jnp.concatenate((flows/jnp.sum(flows), jnp.array([jnp.sum(flows)/jnp.array(1000., dtype=float)])))),
             step_count=state.step_count,
             action_mask=state.action_mask_column,
         )
@@ -345,7 +345,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
     def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array, iterator: chex.Array):
         product_prices = (jnp.arange(len(column_state.components)) * 1 + 5) / 150
-        converged = jnp.asarray((jnp.sum(column_state.V[0])>0) & (column_state.converged==1) & (iterator < 100))
+        converged = jnp.asarray((jnp.nan_to_num(jnp.sum(column_state.V[0]))>0) & (column_state.converged==1) & (iterator < 100))
         step = state.column_count - (1-converged)
         state = state.replace(stream=state.stream.replace(
             flows=state.stream.flows.at[:, step].set(state.stream.flows[:, state.column_count - 1]),

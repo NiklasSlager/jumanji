@@ -163,7 +163,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             key=N_key,
         )
 
-        done = (next_state.step_count >= self._max_steps) | (jnp.max(state.action_mask_stream) == 0) | (jnp.sum(next_state.stream.isproduct[:, state.step_count])==next_state.step_count)
+        done = (next_state.step_count >= self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
 
         observation = self._state_to_observation(next_state)
 

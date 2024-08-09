@@ -98,14 +98,24 @@ def initial_guess(state: State, nstages, feedstage, pressure, feed, z, distillat
 
 def initial_temperature(state: State):
     t_range = functions.t_sat_solver(state.components, state.pressure)
-    t_range = jnp.where(state.components > 0, t_range, jnp.max(t_range) - 1)
-
-    delta_t = (jnp.max(t_range) - jnp.min(t_range)) / state.Nstages
+    t_minmax = jnp.where(state.z > 0, t_range, 0)
+    t_split = jnp.concatenate((jnp.zeros((), dtype=float)[None], jnp.diff(jnp.sort(jnp.where(state.z > 0, t_range, 0)))))
+    t_split = jnp.where(t_split==jnp.max(t_split), 0, t_split)
+    
+    t_avg_index = jnp.sum(jnp.where(t_split==jnp.max(t_split), jnp.arange(len(t_split)), 0))-1
+    t_avg = t_range[t_avg_index]
+    delta_t = t_split[t_avg_index+1] / (state.Nstages)
+    t_avg = t_avg-t_split[t_avg_index+1]/2
     return state.replace(
         temperature=jnp.where(jnp.arange(len(state.temperature)) < state.Nstages,
-                              jnp.min(t_range) + jnp.arange(len(state.temperature)) * delta_t, 0),
+                              t_avg- + jnp.arange(len(state.temperature)) * delta_t , 0),
     )
-
+    '''
+    return state.replace(
+        temperature=jnp.where(jnp.arange(len(state.temperature)) < state.Nstages,
+                              jnp.min(t_range) + jnp.arange(len(state.temperature)) * delta_t + (jnp.max(t_range) - jnp.min(t_range)) , 0),
+    )
+    '''
 
 def f_sol(state: State, tray_low, tray, tray_high, j):
     f_s = jacobian.f_vector_function(
@@ -125,7 +135,7 @@ def update_NR(state: State):
                                                          state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
     dx = jnp.nan_to_num(functions.thomas(a, b, c, -1 * f, state.Nstages))  # .reshape(-1,1)
     
-    def min_res(t, state: State, dx):
+    def min_res(t, state: State, dx, f):
         dx_v = dx[:, :len(state.components)].transpose()
         dx_l = dx[:, -len(state.components):].transpose()
         dx_t = dx[:, len(state.components)].transpose()
@@ -136,10 +146,10 @@ def update_NR(state: State):
         v_max = jnp.max(state.trays.tray.v)
         l_max = jnp.max(state.trays.tray.l)
         # temp = jnp.where(dx[:, len(state.components)].transpose() < 10., jnp.where(dx[:, len(state.components)].transpose() > -10., state.trays.tray.T + t * dx[:, len(state.components)].transpose(), state.trays.tray.T - 10.), state.trays.tray.T + 10.)
-        v_new_final = jnp.where(v_new > 0., v_new, state.trays.tray.v
-                                * jnp.exp(t * dx_v / jnp.where(state.trays.tray.v > 0, state.trays.tray.v, 1e30)))
-        l_new_final = jnp.where(l_new > 0., l_new, state.trays.tray.l
-                                * jnp.exp(t * dx_l / jnp.where(state.trays.tray.l > 0, state.trays.tray.l, 1e30)))
+        v_new_final = jnp.where(v_new >= 0., v_new, state.trays.tray.v
+                                * jnp.exp(t * dx_v / jnp.where(state.trays.tray.v > 0, state.trays.tray.v, 1e-10)))
+        l_new_final = jnp.where(l_new >= 0., l_new, state.trays.tray.l
+                                * jnp.exp(t * dx_l / jnp.where(state.trays.tray.l > 0, state.trays.tray.l, 1e-10)))
         temp_final = jnp.where(jnp.abs(dx_t * t) > 7., (state.trays.tray.T + 7. * (dx_t) / (jnp.abs(dx_t))),
                                (state.trays.tray.T + t * dx_t))
 
@@ -147,6 +157,19 @@ def update_NR(state: State):
                                 state.trays.tray.v + 0.45 * state.trays.tray.v * dx_v / jnp.abs(dx_v), v_new_final)
         l_new_final = jnp.where((jnp.abs(dx_l * t) > 0.45 * state.trays.tray.l),
                                 state.trays.tray.l + 0.45 * state.trays.tray.l * dx_l / jnp.abs(dx_l), l_new_final)
+        '''
+
+        v_new_final = jnp.where((jnp.abs(dx_v * t) > 0.45 * state.trays.tray.v),
+                                jnp.where(state.trays.tray.v > 1e-3,
+                                          state.trays.tray.v + 0.45 * state.trays.tray.v * dx_v / jnp.abs(dx_v),
+                                          state.trays.tray.v + jnp.max(jnp.abs(f))* dx_v / jnp.abs(dx_v)),
+                                v_new_final)
+        l_new_final = jnp.where((jnp.abs(dx_l * t) > 0.45 * state.trays.tray.l),
+                                jnp.where(state.trays.tray.l > 1e-3,
+                                          state.trays.tray.l + 0.45 * state.trays.tray.l * dx_l / jnp.abs(dx_l),
+                                          state.trays.tray.l + jnp.max(jnp.abs(f)) * dx_l / jnp.abs(dx_l)),
+                                l_new_final)
+        '''
 
         state = state.replace(
             V=jnp.sum(v_new_final, axis=0),
@@ -162,11 +185,11 @@ def update_NR(state: State):
 
         return jnp.sum(f ** 2), state
 
-    carry = vmap(min_res, in_axes=(0, None, None))(jnp.arange(0.2, 1.3, 0.001), state, dx)
+    carry = vmap(min_res, in_axes=(0, None, None, None))(jnp.arange(0.5, 1.3, 0.01), state, dx, f)
     result, states = carry
-    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.2, 1.3, 0.001), 0))
+    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.5, 1.3, 0.01), 0))
 
-    res, state_new = min_res(new_t, state, dx)
+    res, state_new = min_res(new_t, state, dx, f)
     zeros = None
     dx_final = None
 
@@ -285,6 +308,10 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     state, _ = jax.lax.scan(for_body, state, jnp.arange(3))
     '''
     state = initial_composition.bubble_point(state)
+    #state = initial_composition.model_solver(state)
+    #state = functions.y_func(state)
+    state = state.replace(X=jnp.nan_to_num(jnp.where((jnp.tile(state.z, (len(state.L),1)).transpose() > 0) & (state.X <=1e-3 ), state.X+1e-3, state.X)/jnp.sum(state.X, axis=0)),
+                          Y=jnp.nan_to_num(jnp.where((jnp.tile(state.z, (len(state.L),1)).transpose() > 0) & (state.Y <=1e-3 ), state.Y+1e-3, state.Y)/jnp.sum(state.Y, axis=0)))
     
     state, iterations, res = converge_column(state)
     state = state.replace(
@@ -295,15 +322,25 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
                                                                             state.components).transpose() * state.Y,
                      axis=0)
     )
-
+    #state = state.replace(X=jnp.nan_to_num(jnp.where(state.X > 0, state.X+1e-6, state.X)/jnp.sum(state.X, axis=0)),
+    #                      Y=jnp.nan_to_num(jnp.where(state.Y > 0, state.Y+1e-6, state.Y)/jnp.sum(state.Y, axis=0)))
     state = condensor_duty(state)
     state = reboiler_duty(state)
     state = costing.tac(state)
     real_tac = jnp.where(iterations<100, state.TAC, 75)
     state = state.replace(TAC=real_tac)
-    state = convergence_check(state)
+    #state = convergence_check(state)
+    comps = jnp.sum(jnp.where(state.z>0, 1, 0))
+    state = state.replace(
+        converged=(res < state.Nstages * (2 * comps + 1) * jnp.sum(state.F) * 1e-9) & (iterations<100))
     #state = flowcheck(state)
 
+    # a, b, c = pure_jac(state)
+    #state = matrix_transforms.trays_func(state)
+    #a, b, c = jacobian.jacobian_func(state)
+    #f = vmap(f_sol, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
+    #                                                    state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
+    #dx = jnp.nan_to_num(functions.thomas(a, b, c, -1 * f, state.Nstages))
     return state, iterations, res
 
 

@@ -65,7 +65,7 @@ def model_solver(state: State):
 def cond_fn_temperature(args):
     state, t_old, tol, iterations = args
     error = jnp.abs(state.temperature - t_old)
-    return (iterations < 5) & (jnp.any(error > tol))
+    return (iterations < 50) & (jnp.any(error > tol))
 
 
 def body_fn_temperature(args):
@@ -108,7 +108,7 @@ def bubble_point(state):
                                                                               state.components).transpose() * state.Y,
                      axis=0)
     )
-    #state = flowrates(state)
+    state = flowrates(state)
     return state
 
 

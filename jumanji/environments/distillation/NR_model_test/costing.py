@@ -2,6 +2,31 @@ import jax.numpy as jnp
 from jumanji.environments.distillation.NR_model_test.distillation_types import State
 from jumanji.environments.distillation.NR_model_test.data_property import MW, DENSITY
 
+MW = jnp.array([44.09652,
+                     58.1234,
+                     58.1234,
+                     72.15028,
+                     70.1344,
+                     86.17716,
+                     100.20404,
+                     100.20404,
+                     114.23092,
+                     114.23092
+                     ], dtype=float) # kg/kmol
+
+DENSITY = jnp.array([582.16062595505,
+                     595.443221427136,
+                     603.035386342418,
+                     611.258995343012,
+                     718.953321022845,
+                     615.501010415606,
+                     639.116574979533,
+                     614.978050422831,
+                     615.56023902613,
+                     613.127610604072
+                     ], dtype=float)
+
+
 def diameter(state: State, l_s):
     r_gas = 8.314
     mw_series = MW

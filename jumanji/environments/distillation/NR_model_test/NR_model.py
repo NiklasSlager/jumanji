@@ -12,7 +12,7 @@ import os
 
 def initialize():
     n_max = 104
-    c_max = 8
+    c_max = 10
     dir = os.path.join(os.getcwd(), 'Pure component parameters')
     # psat_params, cpvap_params, hvap_params, hform_params = thermodynamics.retrieve_params(dir)
     return State(
@@ -71,7 +71,7 @@ def initial_guess(state: State, nstages, feedstage, pressure, feed, z, distillat
     #fug_state = purity_constraint.FUG_specs(z, heavy_recovery, light_recovery, pressure, feed)
     #fug_state = fug_state._replace(stages=nstages)
     #fug_state = purity_constraint.feedstage(fug_state)
-    feedstage = jnp.ceil((nstages+1)/2) #jnp.where(specs == True, fug_state.feed_stage, feedstage)
+    #feedstage = jnp.ceil((nstages+1)/2) #jnp.where(specs == True, fug_state.feed_stage, feedstage)
     #rr = jnp.where(specs == True, fug_state.reflux, rr)
     #distillate = jnp.where(specs == True, fug_state.distillate, distillate)
     l_init = jnp.where(jnp.arange(len(state.L)) < feedstage - 1, rr * distillate, rr * distillate + jnp.sum(feed))
@@ -161,10 +161,10 @@ def update_NR(state: State):
         temp_final = jnp.where(jnp.abs(dx_t * t_t) > 7., (state.trays.tray.T + 7. * (dx_t) / (jnp.abs(dx_t))),
                                (state.trays.tray.T + t_t * dx_t))
         
-        v_new_final = jnp.where((jnp.abs(dx_v * t_v) > 0.75 * state.trays.tray.v),
-                                state.trays.tray.v + 0.75 * state.trays.tray.v * dx_v / jnp.abs(dx_v), v_new_final)
-        l_new_final = jnp.where((jnp.abs(dx_l * t_l) > 0.75 * state.trays.tray.l),
-                                state.trays.tray.l + 0.75 * state.trays.tray.l * dx_l / jnp.abs(dx_l), l_new_final)
+        v_new_final = jnp.where((jnp.abs(dx_v * t_v) > 0.55 * state.trays.tray.v),
+                                state.trays.tray.v + 0.55 * state.trays.tray.v * dx_v / jnp.abs(dx_v), v_new_final)
+        l_new_final = jnp.where((jnp.abs(dx_l * t_l) > 0.55 * state.trays.tray.l),
+                                state.trays.tray.l + 0.55 * state.trays.tray.l * dx_l / jnp.abs(dx_l), l_new_final)
         '''
         
         v_new_final = jnp.where((jnp.abs(dx_v * t) > 0.45 * state.trays.tray.v),
@@ -326,13 +326,7 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     def for_body(state, i):
         return initial_composition.bubble_point(state), None
 
-    state, _ = jax.lax.scan(for_body, state, jnp.arange(2))
-
-    #state = initial_composition.bubble_point(state)
-    #state = initial_composition.model_solver(state)
-    #state = functions.y_func(state)
-    #state = state.replace(X=jnp.nan_to_num(jnp.where((jnp.tile(state.z, (len(state.L),1)).transpose() > 0) & (state.X <=1e-3 ), state.X+1e-3, state.X)/jnp.sum(state.X, axis=0)),
-    #                      Y=jnp.nan_to_num(jnp.where((jnp.tile(state.z, (len(state.L),1)).transpose() > 0) & (state.Y <=1e-3 ), state.Y+1e-3, state.Y)/jnp.sum(state.Y, axis=0)))
+    state, _ = jax.lax.scan(for_body, state, jnp.arange(4))
 
     state = matrix_transforms.trays_func(state)
 
@@ -346,8 +340,6 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
                                                                             state.components).transpose() * state.Y,
                      axis=0)
     )
-    #state = state.replace(X=jnp.nan_to_num(jnp.where(state.X > 0, state.X+1e-6, state.X)/jnp.sum(state.X, axis=0)),
-    #                      Y=jnp.nan_to_num(jnp.where(state.Y > 0, state.Y+1e-6, state.Y)/jnp.sum(state.Y, axis=0)))
     state = condensor_duty(state)
     state = reboiler_duty(state)
     state = costing.tac(state)

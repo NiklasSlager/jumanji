@@ -34,11 +34,12 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
     def __init__(
             self,
-            stage_bound: Tuple[int, int] = (5, 100),
+            stage_bound: Tuple[int, int] = (5, 60),
             pressure_bound: Tuple[float, float] = (1, 10),
-            reflux_bound: Tuple[float, float] = (0.01, 10),
+            reflux_bound: Tuple[float, float] = (0.1, 15),
             distillate_bound: Tuple[float, float] = (0.010, 0.990),
-            step_limit: int = 5,
+            feed_bound: Tuple[float, float] = (1.2, 3.),
+            step_limit: int = 9,
 
     ):
         """Instantiates a `Snake` environment.
@@ -54,6 +55,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         self._pressure_bounds = pressure_bound
         self._reflux_bounds = reflux_bound
         self._distillate_bounds = distillate_bound
+        self._feed_bounds = feed_bound
         self._max_steps = step_limit
 
         super().__init__()
@@ -70,15 +72,16 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                 environment.
         """
 
-        feed = jnp.array([0., 0.1, 0.2, 0.25, 0.25, 0., 0.15, 0.1], dtype=float)
+        feed = jnp.array([0.08, 0.14, 0.2, 0.23, 0.25, 0.21, 0.17, 0.15, 0.11, 0.07], dtype=float)
         feed = feed/jnp.sum(feed) * jnp.array(1000., dtype=float)
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))
         action_mask = jnp.array(
-            (jnp.concatenate((jnp.ones(96, dtype=bool), jnp.zeros(4, dtype=bool))),
+            (jnp.concatenate((jnp.ones(56, dtype=bool), jnp.zeros(44, dtype=bool))),
              #jnp.concatenate((jnp.ones(65, dtype=bool), jnp.zeros(35, dtype=bool))),
              jnp.ones(100),
-             jnp.ones(100)
+             jnp.ones(100),
+             jnp.concatenate((jnp.ones(30, dtype=bool), jnp.zeros(70, dtype=bool)))
              ))
         state = State(
             stream=stream,
@@ -138,7 +141,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         column_state, iterator, res = jax.jit(simulation)(
             state=init_column,
             nstages=jnp.int32(column_input.n_stages),
-            feedstage=jnp.array(10, dtype=int),
+            feedstage=column_input.feed_stage,
             pressure=column_input.pressure,
             feed=feed,
             z=z,
@@ -163,7 +166,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             key=N_key,
         )
 
-        done = (next_state.step_count >= self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
+        done = (next_state.step_count > self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
 
         observation = self._state_to_observation(next_state)
 
@@ -188,7 +191,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                   "action_C2.2": next_state.stream.action[-1, -1, 1],
                   "action_C2.3": next_state.stream.action[-1, -1, 2],
                   "nr_product_streams": jnp.sum(jnp.max(next_state.stream.isproduct, axis=1)),
-                  "nr_columns": jnp.sum(next_state.overall_stream_actions),
+                  "nr_columns": jnp.sum(next_state.overall_stream_actions)-1,
                   "iterations": iterator,
                   "converged": column_state.converged,
                   "outflow": jnp.sum(jnp.max(next_state.stream.isproduct*jnp.sum(next_state.stream.flows, axis=2), axis=1)),
@@ -225,7 +228,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         """
 
         grid = specs.BoundedArray(
-            shape=(9,),
+            shape=(11,),
             minimum=0.0,
             maximum=1.0,
             dtype=float,
@@ -235,7 +238,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             self._max_steps, dtype=jnp.int32, name="step_count"
         )
         action_mask = specs.BoundedArray(
-            shape=(3, 100),
+            shape=(4, 100),
             dtype=bool,
             minimum=False,
             maximum=True,
@@ -259,7 +262,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         continuous_spec = specs.BoundedArray(shape=(5,), dtype=float, minimum=-1, maximum=1,
                                              name="action_continuous")
         discrete_spec = specs.MultiDiscreteArray(
-            num_values=jnp.array([100] * 3, jnp.int32),
+            num_values=jnp.array([100] * 4, jnp.int32),
             dtype=jnp.int32,
             name="action_discrete")
         return discrete_spec
@@ -282,20 +285,23 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         return column_spec
 
     def _action_to_column_spec(self, action: chex.Array):
-        action_N, action_RR, action_D = action
+        action_N, action_RR, action_D, action_F = action
         #action_N = action // 2500
         #action_RR = action % 2500 // 50
         #action_D = action % 50
 
-        new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 95]), jnp.array(self._stage_bounds)))
+        new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 55]), jnp.array(self._stage_bounds)))
         #new_P = jnp.interp(action_P, jnp.array([0, 10]), jnp.array(self._pressure_bounds))
         new_RR = jnp.interp(action_RR, jnp.array([0, 99]), jnp.array(self._reflux_bounds))
         new_D = jnp.interp(action_D, jnp.array([0, 99]), jnp.array(self._distillate_bounds))
+        new_F = jnp.interp(action_F, jnp.array([0, 29]), jnp.array(self._feed_bounds))
+
         return ColumnInputSpecification(
             n_stages=new_N,
             reflux_ratio=new_RR,
             distillate=new_D,
-            pressure=jnp.array(1., dtype=float)
+            pressure=jnp.array(1., dtype=float),
+            feed_stage=jnp.array(new_N/new_F, dtype=int)
         )
 
     def _state_to_observation(self, state: State) -> Observation:
@@ -334,7 +340,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             pressure=jnp.zeros((matsize, matsize)),
             stages=jnp.zeros((matsize, matsize)),
             converged=jnp.zeros((matsize, matsize)),
-            action=jnp.zeros((matsize, matsize, 3)),
+            action=jnp.zeros((matsize, matsize, 4)),
             iterations=jnp.zeros((matsize, matsize)),
         )
 
@@ -434,6 +440,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         products = product_mask[x_column, jnp.max(jnp.where(action_mask, stream_levels, 0), axis=0)]
         level_step = jnp.asarray(jnp.where(jnp.diff(x_column) - jnp.diff(row_count) == 1, 1, 0), dtype=float)
         return x_column, y_column, products, level_step
+
 
     def _stream_level_scan(self, carry, i):
         action_mask, product_mask, row_repeat, row_count, x_column, streams = carry

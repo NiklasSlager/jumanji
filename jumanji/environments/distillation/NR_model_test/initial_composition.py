@@ -49,7 +49,7 @@ def solve_x(state, component):
     b = bij(state, component)
     #matrix = massmatrix(state, component)
     #solution = lineax.linear_solve(lineax.MatrixLinearOperator(massmatrix(state, component)), b, solver=lineax.QR()).value
-    return jnp.where(component > 0, jax.scipy.linalg.solve(massmatrix(state, component), b), 0)
+    return jax.scipy.linalg.solve(massmatrix(state, component), b)
     #return jnp.where(component > 0, solution, 0)
 
 

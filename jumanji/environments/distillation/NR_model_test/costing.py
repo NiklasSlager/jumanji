@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 from jumanji.environments.distillation.NR_model_test.distillation_types import State
-from jumanji.environments.distillation.NR_model_test.data_property import MW, DENSITY
+#from jumanji.environments.distillation.NR_model_test.data_property import MW, DENSITY
 
 MW = jnp.array([44.09652,
                      58.1234,

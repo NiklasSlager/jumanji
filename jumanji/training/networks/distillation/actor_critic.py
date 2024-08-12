@@ -89,7 +89,7 @@ class DistillationTorso(hk.Module):
         # O: observation size
         # H: hidden/embedding size
         # (B, N, O)
-        num_agents = 3
+        num_agents = 4
         obs = observation.grid
         agents_view = jnp.tile(obs, num_agents).reshape(obs.shape[0], num_agents, obs.shape[-1])  # (B, N, W * H)
 

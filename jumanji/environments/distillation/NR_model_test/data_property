@@ -43,4 +43,4 @@ HFORM = jnp.array([-25.0024,
                    -44.8194,
                    -53.1456,
                    -49.8591
-                   ], dtype=float) * jnp.array(4.184, dtype=float  #KCAL/mol
+                   ], dtype=float) * jnp.array(4.184, dtype=float)  #KCAL/mol

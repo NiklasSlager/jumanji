@@ -52,6 +52,7 @@ class ColumnInputSpecification(NamedTuple):
     reflux_ratio: chex.Scalar
     distillate: chex.Scalar
     pressure: chex.Scalar
+    feed_stage: chex.Scalar
 
 
 class Observation(NamedTuple):

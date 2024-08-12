@@ -4,62 +4,12 @@ from jax import vmap
 from jumanji.environments.distillation.NR_model_test.distillation_types import State, Thermo
 import os
 from jumanji.environments.distillation.NR_model_test.physical_data_sets import psat_params, cpvap_params, hvap_params, hform_params
-
-'''
-def retrieve_params(dir):
-    params_psat_list = psat_params(dir)
-    params_cpvap_list = cpvap_params(dir)
-    params_hvap_list = hvap_params(dir)
-    hform_list = hform_data(dir)
-    return params_psat_list, params_cpvap_list, params_hvap_list, hform_list
-
-def psat_params(dir):
-    params_psat = []
-    with jnp.open(os.path.join(dir, 'Antoine.csv'), 'r') as fs:
-        next(fs)  # skip header row
-        for line in fs:
-            fields = line.strip().split(',')
-            params_psat.append(list(map(float, fields[1:])))
-    return jnp.array(params_psat, dtype=float)
-
-
-def cpvap_params(dir):
-    params_cpvap = []
-    with open(os.path.join(dir, 'Vapor_Cp.csv'), 'r') as fs:
-        next(fs)  # skip header row
-        for line in fs:
-            fields = line.strip().split(',')
-            params_cpvap.append(list(map(float, fields[1:])))
-
-    return jnp.array(params_cpvap, dtype=float)
-
-
-def hvap_params(dir):
-    params_hvap = []
-    with open(os.path.join(dir, 'Heat_of_evaporation.csv'), 'r') as fs:
-        next(fs)  # skip header row
-        for line in fs:
-            fields = line.strip().split(',')
-            params_hvap.append(list(map(float, fields[1:])))
-    return jnp.array(params_hvap, dtype=float)
-
-
-def hform_data(dir):
-    hform = []
-    with open(os.path.join(dir, 'Heat_of_formation.csv'), 'r') as fs:
-        next(fs)  # skip header row
-        for line in fs:
-            fields = line.strip().split(',')
-            hform.append(fields[1])
-
-    hform = jnp.array(hform, float) * 4.184
-    return hform
-'''
+from jumanji.environments.distillation.NR_model_test.data_property import DHV, HFORM, CPIG, PSAT
 
 
 def p_sat(temp, compound):
     #dir = os.path.join(os.getcwd(), 'Pure component parameters')
-    params = psat_params()[compound]
+    params = PSAT[compound]
     a, b, c, d, e, f, g, h, i = params
     return jnp.exp(a + b / (temp + c) + d * temp + e * jnp.log(temp) + f * temp ** g)
 
@@ -76,7 +26,7 @@ def k_eq(temp, component, pressure):
     return result
 
 def cp_vap(temperature, compound):
-    params = cpvap_params()[compound]
+    params = CPIG[compound]
     a, b, c, d, e, f, g = params
 
     def cp(temp):
@@ -86,7 +36,7 @@ def cp_vap(temperature, compound):
 
 
 def h_evap(temperature, compound):
-    params = hvap_params()[compound]
+    params = DHV[compound]
     a, b, c, d, e, f, g = params
 
     tc = g + 273.15
@@ -97,13 +47,13 @@ def h_evap(temperature, compound):
 def liquid_enthalpy(temperature, components):
     def calculate_h_liq(temperature, i):
         return hform_params()[i] + cp_vap(temperature, i) - h_evap(temperature, i)
-    return jnp.where(components>0, vmap(calculate_h_liq, in_axes=(None, 0))(temperature, components), 0)
+    return vmap(calculate_h_liq, in_axes=(None, 0))(temperature, components)
 
 
 def vapor_enthalpy(temperature, components):
     def calculate_h_vap(temperature, i):
         return hform_params()[i] + cp_vap(temperature, i)
-    return jnp.where(components > 0, vmap(calculate_h_vap, in_axes=(None, 0))(temperature, components), 0)
+    return vmap(calculate_h_vap, in_axes=(None, 0))(temperature, components)
 
 
 def t_solver(state, tray, temperature, xc):

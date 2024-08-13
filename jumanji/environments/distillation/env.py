@@ -34,9 +34,9 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
     def __init__(
             self,
-            stage_bound: Tuple[int, int] = (5, 60),
+            stage_bound: Tuple[int, int] = (5, 85),
             pressure_bound: Tuple[float, float] = (1, 10),
-            reflux_bound: Tuple[float, float] = (0.1, 15),
+            reflux_bound: Tuple[float, float] = (0.1, 10.),
             distillate_bound: Tuple[float, float] = (0.010, 0.990),
             feed_bound: Tuple[float, float] = (1.2, 3.),
             step_limit: int = 9,
@@ -77,11 +77,11 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))
         action_mask = jnp.array(
-            (jnp.concatenate((jnp.ones(56, dtype=bool), jnp.zeros(44, dtype=bool))),
+            (jnp.concatenate((jnp.ones(81, dtype=bool), jnp.zeros(69, dtype=bool))),
              #jnp.concatenate((jnp.ones(65, dtype=bool), jnp.zeros(35, dtype=bool))),
-             jnp.ones(100),
-             jnp.ones(100),
-             jnp.concatenate((jnp.ones(30, dtype=bool), jnp.zeros(70, dtype=bool)))
+             jnp.concatenate((jnp.ones(100, dtype=bool), jnp.zeros(50, dtype=bool))),
+             jnp.ones(150,dtype=bool),
+             jnp.concatenate((jnp.ones(30, dtype=bool), jnp.zeros(120, dtype=bool)))
              ))
         state = State(
             stream=stream,
@@ -191,7 +191,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                   "action_C2.2": next_state.stream.action[-1, -1, 1],
                   "action_C2.3": next_state.stream.action[-1, -1, 2],
                   "nr_product_streams": jnp.sum(jnp.max(next_state.stream.isproduct, axis=1)),
-                  "nr_columns": jnp.sum(next_state.overall_stream_actions)-1,
+                  "nr_columns": jnp.sum(next_state.overall_stream_actions),
                   "iterations": iterator,
                   "converged": column_state.converged,
                   "outflow": jnp.sum(jnp.max(next_state.stream.isproduct*jnp.sum(next_state.stream.flows, axis=2), axis=1)),
@@ -238,7 +238,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             self._max_steps, dtype=jnp.int32, name="step_count"
         )
         action_mask = specs.BoundedArray(
-            shape=(4, 100),
+            shape=(4, 150),
             dtype=bool,
             minimum=False,
             maximum=True,
@@ -262,7 +262,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         continuous_spec = specs.BoundedArray(shape=(5,), dtype=float, minimum=-1, maximum=1,
                                              name="action_continuous")
         discrete_spec = specs.MultiDiscreteArray(
-            num_values=jnp.array([100] * 4, jnp.int32),
+            num_values=jnp.array([150] * 4, jnp.int32),
             dtype=jnp.int32,
             name="action_discrete")
         return discrete_spec
@@ -290,10 +290,10 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         #action_RR = action % 2500 // 50
         #action_D = action % 50
 
-        new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 55]), jnp.array(self._stage_bounds)))
+        new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 80]), jnp.array(self._stage_bounds)))
         #new_P = jnp.interp(action_P, jnp.array([0, 10]), jnp.array(self._pressure_bounds))
         new_RR = jnp.interp(action_RR, jnp.array([0, 99]), jnp.array(self._reflux_bounds))
-        new_D = jnp.interp(action_D, jnp.array([0, 99]), jnp.array(self._distillate_bounds))
+        new_D = jnp.interp(action_D, jnp.array([0, 149]), jnp.array(self._distillate_bounds))
         new_F = jnp.interp(action_F, jnp.array([0, 29]), jnp.array(self._feed_bounds))
 
         return ColumnInputSpecification(
@@ -350,7 +350,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
 
     def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array, iterator: chex.Array):
-        product_prices = (jnp.arange(len(column_state.components)) * 1 + 5) / 150
+        product_prices = 0.15
         converged = jnp.asarray((jnp.nan_to_num(jnp.sum(column_state.V[0]))>0) & (column_state.converged==1))
         step = state.column_count - (1-converged)
         state = state.replace(stream=state.stream.replace(

@@ -369,7 +369,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
         bot_flow_isproduct = self._is_product_stream(bot_flow, converged)
         top_flow_isproduct = self._is_product_stream(top_flow, converged)
-        feedflows = state.stream.flows[(jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), state.column_state-1]
+        feedflows = state.stream.flows[(jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), state.column_count-1]
         real_flows = jnp.where(converged == True, jnp.array((top_flow, bot_flow)), feedflows)
 
         column_cost = jnp.where((jnp.abs(jnp.nan_to_num(column_state.TAC) < 100.)) & (jnp.abs(jnp.nan_to_num(column_state.TAC) > 0.), jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F)), jnp.nan_to_num(-75./jnp.sum(column_state.F))))

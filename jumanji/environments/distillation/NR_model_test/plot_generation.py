@@ -40,10 +40,12 @@ def plot_function(stages, L, V, temperature, H_liq, H_vap, xnorm, y, components)
     axs[1, 1].grid(True)
     axs[1, 1].set_xticks(jnp.arange(1, len(stages)))
 
-    component_names = ['C1', 'C2', 'C3', 'C4', 'C5', 'I-C5', 'C6', 'C8']
-    for xc in range(0, len(components)):
-        if any(xnorm[xc, :]) > 0:
-            axs[1, 2].plot(stages, xnorm[xc, :], label=component_names[xc]) #, label=[key for key, value in components.items() if value == xc]
+    cat = ["C3", "I-C4", "C4", "C5", "C-C5", "C6", "T-C4", "C7", "D-C6", "C8"]
+    components = jnp.where(components>0, components+1, 0)
+    for xc in components:
+        if xc > 0:
+            axs[1, 2].plot(stages, xnorm[xc-1, :], label=component_names[xc-1]) #, label=[key for key, value in components.items() if value == xc]
+
 
     axs[1, 2].set_title('Composition')
     axs[1, 2].set_xlabel('Stages')

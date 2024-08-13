@@ -4,7 +4,7 @@ from jax import vmap
 from jumanji.environments.distillation.NR_model_test.distillation_types import State, Thermo
 import os
 from jumanji.environments.distillation.NR_model_test.physical_data_sets import psat_params, cpvap_params, hvap_params, hform_params
-from jumanji.environments.distillation.NR_model_test.data_property import DHV, HFORM, CPIG, PSAT
+#from jumanji.environments.distillation.NR_model_test.data_property import DHV, HFORM, CPIG, PSAT
 
 CPIG = jnp.array([[14.2051,	30.2403,	844.31,	20.5802,	2482.7,	298.15,	1500],
         [18.2464,	40.1309,	826.54,	24.5653,	2483.1,	298.15,	1500],

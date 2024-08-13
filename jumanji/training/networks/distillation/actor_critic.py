@@ -163,7 +163,7 @@ def make_actor_network(
         )
         output = torso(observation)
 
-        head = hk.nets.MLP((*transformer_mlp_units, 100), activate_final=False)
+        head = hk.nets.MLP((*transformer_mlp_units, 150), activate_final=False)
         logits = head(output)  # (B, N, 5)
         return jnp.where(observation.action_mask, logits, jnp.finfo(jnp.float32).min)
 

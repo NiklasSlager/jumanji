@@ -349,7 +349,7 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     comps = jnp.sum(jnp.where(state.z>0, 1, 0))
     state = state.replace(
         converged=(res < state.Nstages * (2 * comps + 1) * jnp.sum(state.F) * 1e-9) & (iterations<100))
-    state = state.replace(TAC= jnp.where(state.converged, state.TAC, 75))
+    state = state.replace(TAC= jnp.where(state.converged, state.TAC, 25))
 
     #state = flowcheck(state)
 

@@ -114,12 +114,6 @@ def initial_temperature(state: State):
         temperature=jnp.where(jnp.arange(len(state.temperature)) < state.Nstages,
                               t_avg + jnp.arange(len(state.temperature)) * delta_t, 0),
     )
-    '''
-    return state.replace(
-        temperature=jnp.where(jnp.arange(len(state.temperature)) < state.Nstages,
-                              jnp.min(t_range) + jnp.arange(len(state.temperature)) * delta_t + (jnp.max(t_range) - jnp.min(t_range)) , 0),
-    )
-    '''
 
 
 def f_sol(state: State, tray_low, tray, tray_high, j):

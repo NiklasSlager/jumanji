@@ -11,6 +11,16 @@ import os
 import os
 
 
+def g_sol(state: State, tray_low, tray, tray_high, j):
+    f_s = jacobian.g_vector_function(
+        state,
+        Tray(l=tray_low.l[:, j], v=tray_low.v[:, j], T=tray_low.T[j]),
+        Tray(l=tray.l[:, j], v=tray.v[:, j], T=tray.T[j]),
+        Tray(l=tray_high.l[:, j], v=tray_high.v[:, j], T=tray_high.T[j]),
+        j,
+    )
+    return jnp.concatenate((jnp.asarray(f_s.H)[None], jnp.asarray(f_s.M), jnp.asarray(f_s.E)), axis=0)
+
 
 def x_initial(state: State):
     a, b, c = jacobian.g_jacobian_func(state)

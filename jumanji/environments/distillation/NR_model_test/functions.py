@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import jax.lax
 from jax import vmap, scipy
 from jaxopt import Bisection
-from jumanji.environments.distillation.NR_model_test.distillation_types import State, Tray, Trays
+from jumanji.environments.distillation.NR_model_test.distillation_types import State, Tray
 from jumanji.environments.distillation.NR_model_test import thermodynamics
 
 

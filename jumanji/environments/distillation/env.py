@@ -39,7 +39,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             reflux_bound: Tuple[float, float] = (0.1, 10.),
             distillate_bound: Tuple[float, float] = (0.010, 0.990),
             feed_bound: Tuple[float, float] = (1.2, 3.),
-            step_limit: int = 4,
+            step_limit: int = 9,
 
     ):
         """Instantiates a `Snake` environment.
@@ -155,7 +155,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         '''
         next_state = self._stream_table_update(state, column_state, action, iterator)
         next_state = self._get_action_mask_stream(next_state)
-        reward = jnp.sum(jnp.nan_to_num(next_state.stream.value[:, state.column_count], nan=-25))
+        reward = jnp.sum(jnp.nan_to_num(next_state.stream.value[:, state.column_count], nan=-45))
         converged = jnp.asarray(((jnp.sum(column_state.V[0]) > 0) & (column_state.converged == 1)), dtype=int)
 
 
@@ -372,7 +372,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         feedflows = state.stream.flows[(jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), state.column_count-1]
         real_flows = jnp.where(converged == True, jnp.array((top_flow, bot_flow)), feedflows)
 
-        column_cost = jnp.where((jnp.abs(jnp.nan_to_num(column_state.TAC) < 100.)) & (jnp.abs(jnp.nan_to_num(column_state.TAC)) > 0.), jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F)), jnp.nan_to_num(-25./jnp.sum(column_state.F)))
+        column_cost = jnp.where((jnp.abs(jnp.nan_to_num(column_state.TAC) < 100.)) & (jnp.abs(jnp.nan_to_num(column_state.TAC)) > 0.), jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F)), jnp.nan_to_num(-45./jnp.sum(column_state.F)))
         stream_table = state.stream.replace(
             flows=state.stream.flows.at[
                 (jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), step].set(

@@ -42,10 +42,9 @@ def x_initial(state: State):
                                 * jnp.exp(t * dx_v / jnp.where(state.trays.tray.v > 0, state.trays.tray.v, 1e30)))
         l_new_final = jnp.where(l_new >= 0., l_new, state.trays.tray.l
                                 * jnp.exp(t * dx_l / jnp.where(state.trays.tray.l > 0, state.trays.tray.l, 1e30)))
-        t_new_final = jnp.where(t_new >= jnp.max(max_t),
-                                jnp.max(max_t),
-                                jnp.where(t_new <= jnp.min(min_t), jnp.min(min_t), t_new)
-                                )*jnp.where(state.temperature>0, 1, 0)
+        t_new_final = jnp.where(t_new >= state.temperature_bounds[-1], state.temperature_bounds[-1],
+                                jnp.where(t_new <= state.temperature_bounds[0], state.temperature_bounds[0], t_new)) * jnp.where(state.trays.tray.T > 0, 1, 0)
+
         state = state.replace(
             Y=jnp.nan_to_num(v_new_final / jnp.sum(v_new_final, axis=0)),
             X=jnp.nan_to_num(l_new_final / jnp.sum(l_new_final, axis=0)),

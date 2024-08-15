@@ -2,7 +2,7 @@ import jax.numpy as jnp
 from jax import jacfwd, vmap
 from jumanji.environments.distillation.NR_model_test.distillation_types import Tray, Mesh, State
 from jumanji.environments.distillation.NR_model_test import thermodynamics as thermo
-from jumanji.environments.distillation.NR_model_test.matrix_transforms import single_tuple_to_matrix
+from jumanji.environments.distillation.NR_model_test.matrix_transforms import single_tuple_to_matrix, trays_func
 
 
 def m_function(state, tray_low, tray, tray_high, i, j):
@@ -138,21 +138,21 @@ def g_jac_c(state: State, tray_low, tray, tray_high, j):
     return single_tuple_to_matrix(c)
 
 
-def jacobian_func(state: State):
-    b = vmap(f_jac_b, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
-                                                           state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
-    a = vmap(f_jac_a, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
-                                                           state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
-    c = vmap(f_jac_c, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
-                                                           state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
+def jacobian_func(state: State, tray_low: Tray, tray_high: Tray, tray: Tray):
+    b = vmap(f_jac_b, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                           tray_high, jnp.arange(len(tray.T)))
+    a = vmap(f_jac_a, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                           tray_high, jnp.arange(len(tray.T)))
+    c = vmap(f_jac_c, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                           tray_high, jnp.arange(len(tray.T)))
     return a[1:, :, :], b, c[:-1, :, :]
 
 
-def g_jacobian_func(state: State):
-    b = vmap(g_jac_b, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
-                                                           state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
-    a = vmap(g_jac_a, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
-                                                           state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
-    c = vmap(g_jac_c, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
-                                                           state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
+def g_jacobian_func(state: State, tray_low: Tray, tray_high: Tray, tray: Tray):
+    b = vmap(g_jac_b, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                           tray_high, jnp.arange(len(tray.T)))
+    a = vmap(g_jac_a, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                           tray_high, jnp.arange(len(tray.T)))
+    c = vmap(g_jac_c, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                           tray_high, jnp.arange(len(tray.T)))
     return a[1:, :, :], b, c[:-1, :, :]

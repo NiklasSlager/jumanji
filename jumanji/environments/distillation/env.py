@@ -165,7 +165,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             overall_stream_actions=state.overall_stream_actions+next_state.action_mask_stream,
             key=N_key,
         )
-
+        self._max_steps += (1-converged)
         done = (next_state.step_count > self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
 
         observation = self._state_to_observation(next_state)

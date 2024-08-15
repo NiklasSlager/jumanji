@@ -44,7 +44,7 @@ def plot_function(stages, L, V, temperature, H_liq, H_vap, xnorm, y, components)
     components = jnp.where(components>0, components+1, 0)
     for xc in components:
         if xc > 0:
-            axs[1, 2].plot(stages, xnorm[xc-1, :], label=component_names[xc-1]) #, label=[key for key, value in components.items() if value == xc]
+            axs[1, 2].plot(stages, xnorm[xc-1, :], label=cat[xc-1]) #, label=[key for key, value in components.items() if value == xc]
 
 
     axs[1, 2].set_title('Composition')

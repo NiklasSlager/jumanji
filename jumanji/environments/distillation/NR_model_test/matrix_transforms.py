@@ -1,30 +1,24 @@
 import jax.numpy as jnp
 from jax import vmap
-from jumanji.environments.distillation.NR_model_test.distillation_types import Trays, Tray, Mesh, NR_State, State
+from jumanji.environments.distillation.NR_model_test.distillation_types import Tray, Mesh, State
 
 
 def trays_func(state: State):
     tray_l = vmap(tray_func, in_axes=(None, 0))(state, jnp.arange(1, len(state.temperature) + 1))
     tray_h = vmap(tray_func, in_axes=(None, 0))(state, jnp.arange(-1, len(state.temperature) - 1))
     tray_m = vmap(tray_func, in_axes=(None, 0))(state, jnp.arange(len(state.temperature)))
-    return state.replace(trays=Trays(
-        low_tray=Tray(
-            l=tray_l.l.transpose(),
-            v=tray_l.v.transpose(),
-            T=tray_l.T.transpose(),
-        ),
-        high_tray=Tray(
-            l=tray_h.l.transpose(),
-            v=tray_h.v.transpose(),
-            T=tray_h.T.transpose(),
-        ),
-        tray=Tray(
-            l=tray_m.l.transpose(),
-            v=tray_m.v.transpose(),
-            T=tray_m.T.transpose(),
-        ),
-        )
-    )
+    return (Tray(l=tray_l.l.transpose(),
+                v=tray_l.v.transpose(),
+                T=tray_l.T.transpose()),
+            Tray(
+                l=tray_h.l.transpose(),
+                v=tray_h.v.transpose(),
+                T=tray_h.T.transpose()),
+            Tray(
+                l=tray_m.l.transpose(),
+                v=tray_m.v.transpose(),
+                T=tray_m.T.transpose())
+            )
 
 
 def tray_func(state: State, j):

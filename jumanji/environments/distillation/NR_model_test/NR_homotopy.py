@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 import jax
 from jax import vmap, lax, jit
-from jumanji.environments.distillation.NR_model_test.distillation_types import State, NR_State, Trays, Tray, Thermo
+from jumanji.environments.distillation.NR_model_test.distillation_types import State, Tray, Thermo
 from jumanji.environments.distillation.NR_model_test import functions, initial_composition, matrix_transforms, jacobian, \
     thermodynamics, costing, purity_constraint, equimolar
 import os
@@ -38,30 +38,10 @@ def initialize():
         CD=jnp.zeros((), dtype=float),
         RD=jnp.zeros((), dtype=float),
         TAC=jnp.zeros((), dtype=float),
-        trays=Trays(
-            low_tray=Tray(
-                l=jnp.zeros((c_max, n_max)),
-                v=jnp.zeros((c_max, n_max)),
-                T=jnp.zeros(n_max)
-            ),
-            high_tray=Tray(
-                l=jnp.zeros((c_max, n_max)),
-                v=jnp.zeros((c_max, n_max)),
-                T=jnp.zeros(n_max)
-            ),
-            tray=Tray(
-                l=jnp.zeros((c_max, n_max)),
-                v=jnp.zeros((c_max, n_max)),
-                T=jnp.zeros(n_max)
-            )
-        ),
         heavy_key=jnp.zeros((), dtype=int),
         light_key=jnp.zeros((), dtype=int),
         heavy_spec=jnp.zeros((), dtype=float),
         light_spec=jnp.zeros((), dtype=float),
-        step_count=jnp.zeros((), dtype=int),  # ()
-        action_mask=jnp.ones(7500, dtype=bool),  # (4,)
-        key=jax.random.PRNGKey(0),  # (2,)
         residuals=jnp.zeros(100, dtype=float),
         analytics=jnp.zeros((), dtype=bool),
         converged=jnp.ones((), dtype=bool)
@@ -70,12 +50,6 @@ def initialize():
 
 def initial_guess(state: State, nstages, feedstage, pressure, feed, z, distillate, rr, analytics: bool, specs: bool,
                   heavy_recovery, light_recovery):
-    # fug_state = purity_constraint.FUG_specs(z, heavy_recovery, light_recovery, pressure, feed)
-    # fug_state = fug_state._replace(stages=nstages)
-    # fug_state = purity_constraint.feedstage(fug_state)
-    # feedstage = jnp.ceil((nstages+1)/2) #jnp.where(specs == True, fug_state.feed_stage, feedstage)
-    # rr = jnp.where(specs == True, fug_state.reflux, rr)
-    # distillate = jnp.where(specs == True, fug_state.distillate, distillate)
     l_init = jnp.where(jnp.arange(len(state.L)) < feedstage - 1, rr * distillate, rr * distillate + jnp.sum(feed))
     l_init = l_init.at[nstages - 1].set((jnp.sum(feed) - distillate))
     v_init = jnp.where(jnp.arange(len(l_init)) > 0, (rr + jnp.ones_like(l_init)) * distillate, distillate)
@@ -132,16 +106,14 @@ def f_sol(state: State, tray_low, tray, tray_high, j):
 
 
 def update_NR(state: State):
-    a, b, c = jacobian.jacobian_func(state)
-    # a = jnp.where(jnp.abs(a) < 1e-3, 0, a)
-    # b = jnp.where(jnp.abs(b) < 1e-3, 0, b)
-    # c = jnp.where(jnp.abs(c) < 1e-3, 0, c)
-    # a, b, c = pure_jac(state)
-    f = vmap(f_sol, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
-                                                         state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
+    tray_low, tray_high, tray = matrix_transforms.trays_func(state)
+    a, b, c = jacobian.jacobian_func(state, tray_low, tray_high, tray)
+    f = vmap(f_sol, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                             tray_high,
+                                                             jnp.arange(len(tray.T)))
     dx = jnp.nan_to_num(functions.thomas(a, b, c, -1 * f, state.Nstages))  # .reshape(-1,1)
 
-    def min_res(t, state: State, dx, f):
+    def min_res(t, state: State, tray, dx, f):
         dx_v = dx[:, :len(state.components)].transpose()
         dx_l = dx[:, -len(state.components):].transpose()
         dx_t = dx[:, len(state.components)].transpose()
@@ -150,26 +122,17 @@ def update_NR(state: State):
         t_l = t  # t[:, -len(state.components):].transpose()
         t_t = t  # t[:, len(state.components)].transpose()
 
-        v_new = (state.trays.tray.v + t_v * dx_v)
-        l_new = (state.trays.tray.l + t_l * dx_l)
-        t_new = (state.trays.tray.T + t_t * dx_t)
+        v_new = (tray.v + t_v * dx_v)
+        l_new = (tray.l + t_l * dx_l)
+        t_new = (tray.T + t_t * dx_t)
 
 
-        # temp = jnp.where(dx[:, len(state.components)].transpose() < 10., jnp.where(dx[:, len(state.components)].transpose() > -10., state.trays.tray.T + t * dx[:, len(state.components)].transpose(), state.trays.tray.T - 10.), state.trays.tray.T + 10.)
-        v_new_final = jnp.where(v_new >= 0., v_new, state.trays.tray.v
-                                * jnp.exp(t_v * dx_v / jnp.where(state.trays.tray.v > 0, state.trays.tray.v, 1e30)))
-        l_new_final = jnp.where(l_new >= 0., l_new, state.trays.tray.l
-                                * jnp.exp(t_l * dx_l / jnp.where(state.trays.tray.l > 0, state.trays.tray.l, 1e30)))
+        v_new_final = jnp.where(v_new >= 0., v_new, tray.v
+                                * jnp.exp(t_v * dx_v / jnp.where(tray.v > 0, tray.v, 1e-10)))
+        l_new_final = jnp.where(l_new >= 0., l_new, tray.l
+                                * jnp.exp(t_l * dx_l / jnp.where(tray.l > 0, tray.l, 1e-10)))
         t_new_final = jnp.where(t_new >= state.temperature_bounds[-1], state.temperature_bounds[-1],
-                                jnp.where(t_new <= state.temperature_bounds[0], state.temperature_bounds[0], t_new)) * jnp.where(state.trays.tray.T > 0, 1, 0)
-
-        '''
-        v_new_final = jnp.where((jnp.abs(dx_v * t_v) > 0.55 * state.trays.tray.v),
-                                state.trays.tray.v + 0.55 * state.trays.tray.v * dx_v / jnp.abs(dx_v), v_new_final)
-        l_new_final = jnp.where((jnp.abs(dx_l * t_l) > 0.55 * state.trays.tray.l),
-                                state.trays.tray.l + 0.55 * state.trays.tray.l * dx_l / jnp.abs(dx_l), l_new_final)
-        '''
-
+                                jnp.where(t_new <= state.temperature_bounds[0], state.temperature_bounds[0], t_new)) * jnp.where(tray.T > 0, 1, 0)
 
         state = state.replace(
             V=jnp.sum(v_new_final, axis=0),
@@ -179,31 +142,20 @@ def update_NR(state: State):
             temperature=t_new_final,
         )
 
-        state = matrix_transforms.trays_func(state)
-        f_new = vmap(f_sol, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
-                                                                 state.trays.high_tray,
-                                                                 jnp.arange(len(state.trays.tray.T)))
+        tray_low, tray_high, tray = matrix_transforms.trays_func(state)
+        f_new = vmap(f_sol, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                                 tray_high,
+                                                                 jnp.arange(len(tray.T)))
 
 
-        return jnp.sum(f ** 2), state
+        return jnp.sum(f_new ** 2), state
 
-    '''
-    res, state_new = min_res(jnp.ones_like(dx), state, dx, f)
-    f_new = vmap(f_sol, in_axes=(None, None, None, None, 0))(state_new, state_new.trays.low_tray, state_new.trays.tray,
-                                                             state_new.trays.high_tray, jnp.arange(len(state_new.trays.tray.T)))
-    dx_new = jnp.nan_to_num(functions.thomas(a, b, c, -1 * jnp.nan_to_num(f_new), state.Nstages))
 
-    #t_scaled = jnp.ones_like(dx)
-    #t_scaled = jnp.where(jnp.abs(t_scaled) > 100.3, 100.3, t_scaled)
-
-    #res, state_new = min_res(t_scaled, state, dx, f)
-
-    '''
-    carry = vmap(min_res, in_axes=(0, None, None, None))(jnp.arange(0.01, 1, 0.05), state, dx, f)
+    carry = vmap(min_res, in_axes=(0, None, None, None, None))(jnp.arange(0.01, 1.1, 0.05), state, tray, dx, f)
     result, states = carry
-    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.01, 1, 0.05), 0))
+    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.01, 1.1, 0.05), 0))
 
-    res, state_new = min_res(new_t, state, dx, f)
+    res, state_new = min_res(new_t, state, tray, dx, f)
 
     zeros = None
     dx_final = None
@@ -235,7 +187,6 @@ def store_variable(small_array, larger_array, start_indices):
 def converge_column(state: State):
     # nr_state = initialize_NR(state)x
 
-    state = matrix_transforms.trays_func(state)
     iterations = 0
     res = 0
 
@@ -282,22 +233,6 @@ def reboiler_duty(state: State):
                          CD=state.CD + CD)
 
 
-def test_simulation(state, nstages, feedstage, pressure, feed, z, distillate, rr, analytics=False, specs=False,
-                    heavy_recovery=jnp.array(0.99, dtype=float), light_recovery=jnp.array(0.99, dtype=float)):
-    iterations = 0
-    res = 0
-    # feedstage = jnp.floor((nstages + 1) / 2 )
-    # state = initialize()
-
-    state = initial_guess(state=state, nstages=nstages, feedstage=feedstage, pressure=pressure, feed=feed, z=z,
-                          distillate=distillate, rr=rr, analytics=analytics, specs=specs, heavy_recovery=heavy_recovery,
-                          light_recovery=light_recovery)
-
-    state = initial_temperature(state)
-    state = state.replace(Hfeed=jnp.where(state.F > 0, jnp.sum(thermodynamics.feed_enthalpy(state) * state.z), 0))
-
-    return state, iterations, res
-
 
 def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, rr, analytics=False, specs=False,
                       heavy_recovery=jnp.array(0.99, dtype=float), light_recovery=jnp.array(0.99, dtype=float)):
@@ -313,23 +248,17 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     state = initial_temperature(state)
 
     state = state.replace(Hfeed=jnp.where(state.F > 0, jnp.sum(thermodynamics.feed_enthalpy(state) * state.z), 0))
-    state = initial_composition.model_solver(state)
-    #state = state.replace(X=(jnp.ones(len(state.temperature))[:, None]*state.z).transpose())
-    state = functions.y_func(state)
-    res, state = equimolar.x_initial(state)
-    #state, iterations_eq, res_eq = equimolar.converge_equimolar(state)
-    state = state.replace(
-        Hliq=jnp.sum(vmap(thermodynamics.liquid_enthalpy, in_axes=(0, None))(state.temperature,
-                                                                             state.components).transpose() * state.X,
-                     axis=0),
-        Hvap=jnp.sum(vmap(thermodynamics.vapor_enthalpy, in_axes=(0, None))(state.temperature,
-                                                                            state.components).transpose() * state.Y,
-                     axis=0)
-    )
+    #state, _  = jax.lax.scan(lambda state, i: (initial_composition.model_solver(state), None), state, jnp.arange(25))
+    state = initial_composition.bubble_point(state)
+    #state = state.replace(X=(((jnp.ones(len(state.temperature))[:, None]*state.z + state.X.transpose()))/2).transpose())
+    #state = functions.y_func(state)
+    #res, state = equimolar.x_initial(state)
+    state, iterations, res_eq = equimolar.converge_equimolar(state)
+
     #state = initial_composition.flowrates((state))
 
 
-    #state, iterations, res = converge_column(state)
+    state, iterations, res = converge_column(state)
 
     state = state.replace(
         Hliq=jnp.sum(vmap(thermodynamics.liquid_enthalpy, in_axes=(0, None))(state.temperature,
@@ -341,13 +270,13 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     )
     state = condensor_duty(state)
     state = reboiler_duty(state)
-    #state = costing.tac(state)
+    state = costing.tac(state)
 
     # state = convergence_check(state)
     comps = jnp.sum(jnp.where(state.z > 0, 1, 0))
     state = state.replace(
         converged=(res < state.Nstages * (2 * comps + 1) * jnp.sum(state.F) * 1e-9) & (iterations < 100))
-    state = state.replace(TAC=jnp.where(state.converged, state.TAC, 75))
+    state = state.replace(TAC=jnp.where(state.converged, state.TAC, 45))
 
     # state = flowcheck(state)
 

@@ -172,7 +172,7 @@ def update_NR(state: State):
     result, states = carry
     new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.01, 1., 0.05), 0))
     
-    res, state_new = min_res(new_t, state, dx, f)
+    res, state_new = min_res(new_t, state, tray, dx, f)
 
     zeros = None
     dx_final = None

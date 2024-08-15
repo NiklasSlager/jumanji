@@ -155,7 +155,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         '''
         next_state = self._stream_table_update(state, column_state, action, iterator)
         next_state = self._get_action_mask_stream(next_state)
-        reward = next_state.stream.value[:, state.column_count]
+        reward = jnp.sum(next_state.stream.value[:, state.column_count])
         converged = jnp.asarray(((jnp.sum(column_state.V[0]) > 0) & (column_state.converged == 1)), dtype=int)
 
 
@@ -166,7 +166,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             key=N_key,
         )
 
-        done = (next_state.step_count > self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
+        done = (next_state.step_count >= self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
 
         observation = self._state_to_observation(next_state)
 

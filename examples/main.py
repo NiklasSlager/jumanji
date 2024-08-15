@@ -3,20 +3,6 @@
 import subprocess
 import os
 
-# Based on https://stackoverflow.com/questions/67504079/how-to-check-if-an-nvidia-gpu-is-available-on-my-system
-try:
-    subprocess.check_output('nvidia-smi')
-    print("a GPU is connected.")
-except Exception:
-    # TPU or CPU
-    if "COLAB_TPU_ADDR" in os.environ and os.environ["COLAB_TPU_ADDR"]:
-        import jax.tools.colab_tpu
-
-        jax.tools.colab_tpu.setup_tpu()
-        print("A TPU is connected.")
-    else:
-        print("Only CPU accelerator is connected.")
-Only CPU accelerator is connected.
 import warnings
 warnings.filterwarnings("ignore")
 

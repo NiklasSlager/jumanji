@@ -25,8 +25,8 @@ from jumanji.env import Environment
 # from jumanji.environments.distillation.small_model import simulation
 from jumanji.environments.distillation.NR_model_test.distillation_types import State as ColumnState
 from jumanji.environments.distillation.types import Observation, State, StreamSpec, ColumnInputSpecification
-from jumanji.environments.distillation.NR_model_test.NR_model import inside_simulation as simulation
-from jumanji.environments.distillation.NR_model_test.NR_model import initialize as initialize_column
+from jumanji.environments.distillation.NR_model_test.NR_homotopy import inside_simulation as simulation
+from jumanji.environments.distillation.NR_model_test.NR_homotopy import initialize as initialize_column
 from jumanji.types import TimeStep, restart, termination, transition
 
 

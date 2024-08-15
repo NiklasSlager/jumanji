@@ -17,12 +17,6 @@ class Tray(NamedTuple):
     T: chex.Array
 
 
-class Trays(NamedTuple):
-    low_tray: Tray
-    tray: Tray
-    high_tray: Tray
-
-
 class Mesh(NamedTuple):
     H: jnp.ndarray
     M: jnp.ndarray
@@ -85,52 +79,10 @@ class State:
     RD: chex.Array
     CD: chex.Array
     TAC: chex.Array
-    trays: Trays
     heavy_key: chex.Array
     light_key: chex.Array
     heavy_spec: chex.Array
     light_spec: chex.Array
-    #thermo: Thermo
-    step_count: chex.Numeric  # ()
-    action_mask: chex.Array  # (4,)
-    key: chex.PRNGKey  # (2,)
     residuals: chex.Array
     analytics: bool
     converged: bool
-
-class Jacobian(NamedTuple):
-    A: chex.Array
-    B: chex.Array
-    C: chex.Array
-
-
-class NR_State(NamedTuple):
-    l: jnp.ndarray
-    v: jnp.ndarray
-    temperature: jnp.ndarray
-    f: jnp.ndarray
-    s: jnp.ndarray
-    components: jnp.ndarray
-    z: jnp.ndarray
-    pressure: jnp.ndarray
-    RR: jnp.ndarray
-    distillate: jnp.ndarray
-    Nstages: jnp.ndarray
-    trays: Trays
-    h_feed: jnp.ndarray
-
-
-class Observation(NamedTuple):
-    grid: chex.Array  # (num_rows, num_cols, 5)
-    step_count: chex.Numeric  # Shape ()
-    action_mask: chex.Array  # (4,)
-
-
-
-
-
-
-
-
-
-

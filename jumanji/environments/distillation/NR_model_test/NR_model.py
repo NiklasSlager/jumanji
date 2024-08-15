@@ -23,6 +23,7 @@ def initialize():
         X=jnp.zeros((c_max, n_max), dtype=float),
         Y=jnp.zeros((c_max, n_max), dtype=float),
         temperature=jnp.zeros(n_max, dtype=float),
+        temperature_bounds=jnp.zeros(2, dtype=float),
         F=jnp.zeros(n_max, dtype=float),
         components=jnp.zeros(c_max, dtype=int),
         pressure=jnp.zeros((), dtype=float),
@@ -99,23 +100,24 @@ def initial_guess(state: State, nstages, feedstage, pressure, feed, z, distillat
 def initial_temperature(state: State):
     t_range = functions.t_sat_solver(state.components, state.pressure)
     t_minmax = jnp.where(state.z > 0, t_range, 0)
-    t_split = jnp.concatenate((jnp.zeros((), dtype=float)[None], jnp.diff(jnp.sort(jnp.where(state.z > 0, t_range, 0)))))
-    t_split = jnp.where(t_split==jnp.max(t_split), 0, t_split)
-    
-    t_avg_index = jnp.sum(jnp.where(t_split==jnp.max(t_split), jnp.arange(len(t_split)), 0))-1
+    t_split = jnp.concatenate(
+        (jnp.zeros((), dtype=float)[None], jnp.diff(jnp.sort(jnp.where(state.z > 0, t_range, 0)))))
+
+    max_index = jnp.max(jnp.where(t_split == jnp.max(t_split), jnp.arange(len(t_split)), 0))
+    t_split = jnp.where((t_split == t_split[max_index]) & (max_index > 0), 0, t_split)
+
+    t_avg_index = jnp.sum(jnp.where(t_split == jnp.max(t_split), jnp.arange(len(t_split)), 0)) - 1
     t_avg = t_range[t_avg_index]
-    delta_t = t_split[t_avg_index+1] / (state.Nstages)
-    t_avg = t_avg-t_split[t_avg_index+1]/2
+    delta_t = t_split[t_avg_index + 1] / (state.Nstages)
+    t_avg = t_avg - t_split[t_avg_index + 1] / 2
+
+    min_t = jnp.min(jnp.where((t_minmax > 0) & (t_minmax != jnp.max(t_minmax)), t_minmax, jnp.max(t_minmax) - 1))
     return state.replace(
         temperature=jnp.where(jnp.arange(len(state.temperature)) < state.Nstages,
-                              t_avg- + jnp.arange(len(state.temperature)) * delta_t , 0),
+                              t_avg + jnp.arange(len(state.temperature)) * delta_t, 0),
+        temperature_bounds=jnp.array([jnp.min(min_t), jnp.max(t_minmax)])
     )
-    '''
-    return state.replace(
-        temperature=jnp.where(jnp.arange(len(state.temperature)) < state.Nstages,
-                              jnp.min(t_range) + jnp.arange(len(state.temperature)) * delta_t + (jnp.max(t_range) - jnp.min(t_range)) , 0),
-    )
-    '''
+
 
 def f_sol(state: State, tray_low, tray, tray_high, j):
     f_s = jacobian.f_vector_function(
@@ -150,22 +152,22 @@ def update_NR(state: State):
         
         v_new = (state.trays.tray.v + t_v * dx_v)
         l_new = (state.trays.tray.l + t_l * dx_l)
-        temp = (state.trays.tray.T + t_t * dx_t)
-        v_max = jnp.max(state.trays.tray.v)
-        l_max = jnp.max(state.trays.tray.l)
+        t_new = (state.trays.tray.T + t_t * dx_t)
+
         # temp = jnp.where(dx[:, len(state.components)].transpose() < 10., jnp.where(dx[:, len(state.components)].transpose() > -10., state.trays.tray.T + t * dx[:, len(state.components)].transpose(), state.trays.tray.T - 10.), state.trays.tray.T + 10.)
         v_new_final = jnp.where(v_new >= 0., v_new, state.trays.tray.v
                                 * jnp.exp(t_v * dx_v / jnp.where(state.trays.tray.v > 0, state.trays.tray.v, 1e30)))
         l_new_final = jnp.where(l_new >= 0., l_new, state.trays.tray.l
                                 * jnp.exp(t_l * dx_l / jnp.where(state.trays.tray.l > 0, state.trays.tray.l, 1e30)))
-        temp_final = jnp.where(jnp.abs(dx_t * t_t) > 7., (state.trays.tray.T + 7. * (dx_t) / (jnp.abs(dx_t))),
-                               (state.trays.tray.T + t_t * dx_t))
-        
+        t_new_final = jnp.where(t_new >= state.temperature_bounds[-1], state.temperature_bounds[-1],
+                                jnp.where(t_new <= state.temperature_bounds[0], state.temperature_bounds[0], t_new)) * jnp.where(state.trays.tray.T > 0, 1, 0)
+
+        '''
         v_new_final = jnp.where((jnp.abs(dx_v * t_v) > 0.55 * state.trays.tray.v),
                                 state.trays.tray.v + 0.55 * state.trays.tray.v * dx_v / jnp.abs(dx_v), v_new_final)
         l_new_final = jnp.where((jnp.abs(dx_l * t_l) > 0.55 * state.trays.tray.l),
                                 state.trays.tray.l + 0.55 * state.trays.tray.l * dx_l / jnp.abs(dx_l), l_new_final)
-        '''
+        
         
         v_new_final = jnp.where((jnp.abs(dx_v * t) > 0.45 * state.trays.tray.v),
                                 jnp.where(state.trays.tray.v > 1e-3,
@@ -184,7 +186,7 @@ def update_NR(state: State):
             L=jnp.sum(l_new_final, axis=0),
             Y=jnp.nan_to_num(v_new_final / jnp.sum(v_new_final, axis=0)),
             X=jnp.nan_to_num(l_new_final / jnp.sum(l_new_final, axis=0)),
-            temperature=temp_final,
+            temperature=t_new_final,
         )
 
         state = matrix_transforms.trays_func(state)
@@ -205,9 +207,9 @@ def update_NR(state: State):
     #res, state_new = min_res(t_scaled, state, dx, f)
 
     '''
-    carry = vmap(min_res, in_axes=(0, None, None, None))(jnp.arange(0.1, 1.3, 0.01), state, dx, f)
+    carry = vmap(min_res, in_axes=(0, None, None, None))(jnp.arange(0.01, 1., 0.05), state, dx, f)
     result, states = carry
-    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.1, 1.3, 0.01), 0))
+    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.01, 1., 0.05), 0))
     
     res, state_new = min_res(new_t, state, dx, f)
 
@@ -321,6 +323,7 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     state = state.replace(Hfeed=jnp.where(state.F > 0, jnp.sum(thermodynamics.feed_enthalpy(state) * state.z), 0))
     #state = state.replace(X=(jnp.ones(len(state.temperature))[:, None]*state.z).transpose())
     #state = functions.y_func(state)
+    #state = initial_composition.model_solver(state)
 
 
     def for_body(state, i):

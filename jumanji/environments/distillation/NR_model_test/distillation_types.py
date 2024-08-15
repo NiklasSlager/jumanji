@@ -71,6 +71,7 @@ class State:
     X: chex.Array
     Y: chex.Array
     temperature: chex.Array
+    temperature_bounds: chex.Array
     F: chex.Array
     components: chex.Array
     z: chex.Array

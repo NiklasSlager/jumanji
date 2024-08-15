@@ -32,7 +32,7 @@ def bubble_point(state):
     state, add = jax.lax.scan(for_body, state, jnp.arange(30))
     '''
     #state_init = model_solver(state)
-    state, iterators = converge_temperature(state)
+    state, iterators = initial_composition.converge_temperature(state)
     #state = state.replace(X=(state_init.X*5+state.X)/6)
     state = functions.y_func(state)
 

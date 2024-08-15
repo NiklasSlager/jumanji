@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 import jax
 from jax import vmap, lax, jit
-from jumanji.environments.distillation.NR_model_test.distillation_types import State, NR_State, Trays, Tray, Thermo
+from jumanji.environments.distillation.NR_model_test.distillation_types import State, Tray, Thermo
 from jumanji.environments.distillation.NR_model_test import functions, initial_composition, matrix_transforms, jacobian, \
     thermodynamics, costing, purity_constraint
 import os
@@ -22,28 +22,45 @@ def g_sol(state: State, tray_low, tray, tray_high, j):
     return jnp.concatenate((jnp.asarray(f_s.H)[None], jnp.asarray(f_s.M), jnp.asarray(f_s.E)), axis=0)
 
 
+def bubble_point(state):
+    '''
+    def for_body(state, i):
+        state = model_solver(state)
+        state = functions.stage_temperature(state)
+        return state, i
+
+    state, add = jax.lax.scan(for_body, state, jnp.arange(30))
+    '''
+    #state_init = model_solver(state)
+    state, iterators = converge_temperature(state)
+    #state = state.replace(X=(state_init.X*5+state.X)/6)
+    state = functions.y_func(state)
+
+    return state
+
+
 def x_initial(state: State):
-    a, b, c = jacobian.g_jacobian_func(state)
-    g = vmap(g_sol, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
-                                                         state.trays.high_tray, jnp.arange(len(state.trays.tray.T)))
-    dx = jnp.nan_to_num(functions.thomas(a, b, c, -1 * g, state.Nstages))
-    def min_res(t, state, dx):
+    tray_low, tray_high, tray = matrix_transforms.trays_func(state)
+    a, b, c = jacobian.g_jacobian_func(state, tray_low, tray_high, tray)
+    g = vmap(g_sol, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                             tray_high,
+                                                             jnp.arange(len(tray.T)))
+    dx = jnp.nan_to_num(functions.thomas(a, b, c, -1 * g, state.Nstages))  # .reshape(-1,1)
+    def min_res(t, state, tray, dx):
         dx_v = dx[:, :len(state.components)].transpose()
         dx_l = dx[:, -len(state.components):].transpose()
         dx_t = dx[:, len(state.components)].transpose()
 
-        v_new = (state.trays.tray.v + t *  dx_v)
-        l_new = (state.trays.tray.l + t * dx_l)
-        t_new = (state.trays.tray.T + t * dx_t)
-        max_t = functions.t_sat_solver(state.components, state.pressure)
-        max_t = jnp.where(state.z > 0, max_t, 0)
-        min_t = jnp.min(jnp.where((max_t >0) & (max_t != jnp.max(max_t)), max_t, jnp.max(max_t)-1))
-        v_new_final = jnp.where(v_new >= 0., v_new, state.trays.tray.v
-                                * jnp.exp(t * dx_v / jnp.where(state.trays.tray.v > 0, state.trays.tray.v, 1e30)))
-        l_new_final = jnp.where(l_new >= 0., l_new, state.trays.tray.l
-                                * jnp.exp(t * dx_l / jnp.where(state.trays.tray.l > 0, state.trays.tray.l, 1e30)))
+        v_new = (tray.v + t *  dx_v)
+        l_new = (tray.l + t * dx_l)
+        t_new = (tray.T + t * dx_t)
+
+        v_new_final = jnp.where(v_new >= 0., v_new, tray.v
+                                * jnp.exp(t * dx_v / jnp.where(tray.v > 0, tray.v, 1e-10)))
+        l_new_final = jnp.where(l_new >= 0., l_new, tray.l
+                                * jnp.exp(t * dx_l / jnp.where(tray.l > 0, tray.l, 1e-10)))
         t_new_final = jnp.where(t_new >= state.temperature_bounds[-1], state.temperature_bounds[-1],
-                                jnp.where(t_new <= state.temperature_bounds[0], state.temperature_bounds[0], t_new)) * jnp.where(state.trays.tray.T > 0, 1, 0)
+                                jnp.where(t_new <= state.temperature_bounds[0], state.temperature_bounds[0], t_new)) * jnp.where(tray.T > 0, 1, 0)
 
         state = state.replace(
             Y=jnp.nan_to_num(v_new_final / jnp.sum(v_new_final, axis=0)),
@@ -51,26 +68,26 @@ def x_initial(state: State):
             temperature=t_new_final,
         )
 
-        state = matrix_transforms.trays_func(state)
-
-        g = vmap(g_sol, in_axes=(None, None, None, None, 0))(state, state.trays.low_tray, state.trays.tray,
-                                                                 state.trays.high_tray,
-                                                                 jnp.arange(len(state.trays.tray.T)))
+        #state = matrix_transforms.trays_func(state)
+        tray_low, tray_high, tray = matrix_transforms.trays_func(state)
+        g = vmap(g_sol, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                                 tray_high,
+                                                                 jnp.arange(len(tray.T)))
 
         return jnp.nan_to_num(jnp.sum(g ** 2), nan=1e10), state
 
-    carry = vmap(min_res, in_axes=(0, None, None))(jnp.arange(0.7, 1.3, 0.1), state, dx)
+    carry = vmap(min_res, in_axes=(0, None, None, None))(jnp.arange(0.1, 1.1, 0.1), state, tray, dx)
     result, states = carry
-    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.7, 1.3, 0.1), 0))
+    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.1, 1.1, 0.1), 0))
 
-    res, state_new = min_res(new_t, state, dx)
+    res, state_new = min_res(new_t, state, tray, dx)
     return res, state_new
 
 
 def cond_fn(args):
     state, iterations, res = args
     comps = jnp.sum(jnp.where(state.z > 0, 1, 0))
-    cond = state.Nstages * (2 * comps + 1) * jnp.sum(state.F) * 1e-9
+    cond = state.Nstages * (2 * comps + 1) * jnp.sum(state.F) * 1e-8
     return (iterations < 100) & (res > cond)
 
 
@@ -85,7 +102,6 @@ def body_fn(args):
 def converge_equimolar(state: State):
     # nr_state = initialize_NR(state)x
 
-    state = matrix_transforms.trays_func(state)
     iterations = 0
     res = 0
 

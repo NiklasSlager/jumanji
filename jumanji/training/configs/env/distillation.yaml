@@ -3,18 +3,18 @@ registered_version: Distillation-v0
 
 network:
     transformer_num_blocks: 2
-    transformer_num_heads: 4
+    transformer_num_heads: 8
     transformer_key_size: 16
-    transformer_mlp_units: [256]
+    transformer_mlp_units: [512]
 
 training:
     num_epochs: 5000
-    num_learner_steps_per_epoch: 4
-    n_steps: 10
-    total_batch_size: 4
+    num_learner_steps_per_epoch: 16
+    n_steps: 20
+    total_batch_size: 16
 evaluation:
-    eval_total_batch_size: 4
-    greedy_eval_total_batch_size: 4
+    eval_total_batch_size: 8
+    greedy_eval_total_batch_size: 8
 
 a2c:
     normalize_advantage: False

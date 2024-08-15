@@ -168,7 +168,7 @@ def update_NR(state: State):
     #res, state_new = min_res(t_scaled, state, dx, f)
 
     '''
-    carry = vmap(min_res, in_axes=(0, None, None, None))(jnp.arange(0.01, 1., 0.05), state, dx, f)
+    carry = vmap(min_res, in_axes=(0, None, None, None, None))(jnp.arange(0.01, 1., 0.05), state, tray, dx, f)
     result, states = carry
     new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.01, 1., 0.05), 0))
     

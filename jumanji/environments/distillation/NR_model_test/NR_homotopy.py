@@ -249,7 +249,7 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
 
     state = state.replace(Hfeed=jnp.where(state.F > 0, jnp.sum(thermodynamics.feed_enthalpy(state) * state.z), 0))
     #state, _  = jax.lax.scan(lambda state, i: (initial_composition.model_solver(state), None), state, jnp.arange(25))
-    state = initial_composition.bubble_point(state)
+    state = equimolar.bubble_point(state)
     #state = state.replace(X=(((jnp.ones(len(state.temperature))[:, None]*state.z + state.X.transpose()))/2).transpose())
     #state = functions.y_func(state)
     #res, state = equimolar.x_initial(state)

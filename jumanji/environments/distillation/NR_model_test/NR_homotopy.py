@@ -44,6 +44,7 @@ def initialize():
         light_spec=jnp.zeros((), dtype=float),
         NR_residuals=jnp.ones((), dtype=float),
         EQU_residuals=jnp.ones((), dtype=float),
+        BP_residuals=jnp.ones((), dtype=float),
         analytics=jnp.zeros((), dtype=bool),
         converged=jnp.ones((), dtype=bool),
         NR_iterations=jnp.zeros((), dtype=int),
@@ -87,13 +88,13 @@ def initial_temperature(state: State):
 
     t_avg_index = jnp.sum(jnp.where(t_split == jnp.max(t_split), jnp.arange(len(t_split)), 0)) - 1
     t_avg = t_range[t_avg_index]
-    delta_t = t_split[t_avg_index + 1] / (state.Nstages)
+    delta_t = t_split[t_avg_index + 1] / (state.Nstages-2)
     t_avg = t_avg - t_split[t_avg_index + 1] / 2
 
     min_t = jnp.min(jnp.where((t_minmax > 0) & (t_minmax != jnp.max(t_minmax)), t_minmax, jnp.max(t_minmax) - 1))
     return state.replace(
         temperature=jnp.where(jnp.arange(len(state.temperature)) < state.Nstages,
-                              t_avg + jnp.arange(len(state.temperature)) * delta_t, 0),
+                              t_avg - jnp.arange(len(state.temperature))+5 * delta_t, 0),
         temperature_bounds=jnp.array([jnp.min(min_t), jnp.max(t_minmax)])
     )
 
@@ -218,7 +219,6 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
 
     state = state.replace(Hfeed=jnp.where(state.F > 0, jnp.sum(thermodynamics.feed_enthalpy(state) * state.z), 0))
     state = equimolar.bubble_point(state)
-    state = functions.y_func(state)
     state = equimolar.converge_equimolar(state)
     state = converge_column(state)
     state = state.replace(
@@ -232,7 +232,13 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     state = condensor_duty(state)
     state = reboiler_duty(state)
     state = costing.tac(state)
+
     state = state.replace(
         converged= jnp.asarray((state.NR_residuals < state.Nstages * (2 * jnp.sum(jnp.where(state.z > 0, 1, 0)) + 1) * jnp.sum(state.F) * 1e-9) &
                                (state.NR_iterations < 100)))
+    '''
+    state = state.replace(
+        converged= jnp.asarray((state.BP_residuals < 0.1) &
+                               (state.BP_iterations < 100)))
+                               '''
     return state

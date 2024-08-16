@@ -32,9 +32,11 @@ def bubble_point(state):
     state, add = jax.lax.scan(for_body, state, jnp.arange(30))
     '''
     #state_init = model_solver(state)
-    state, iterators = initial_composition.converge_temperature(state)
+    state = initial_composition.converge_temperature(state)
     state = functions.y_func(state)
+    '''
     state = functions.y_func(state)
+    
     state = state.replace(
         Hliq=jnp.sum(vmap(thermo.liquid_enthalpy, in_axes=(0, None))(state.temperature,
                                                                                state.components).transpose() * state.X,
@@ -44,7 +46,7 @@ def bubble_point(state):
                      axis=0)
     )
     state = flowrates(state)
-
+    '''
     return state
 
 
@@ -56,23 +58,24 @@ def x_initial(state: State):
                                                              jnp.arange(len(tray.T)))
     dx = jnp.nan_to_num(functions.thomas(a, b, c, -1 * g, state.Nstages))  # .reshape(-1,1)
 
+    t = jnp.array(1.0, dtype=float)
     dx_v = dx[:, :len(state.components)].transpose()
     dx_l = dx[:, -len(state.components):].transpose()
     dx_t = dx[:, len(state.components)].transpose()
 
-    v_new = (tray.v + dx_v)
-    l_new = (tray.l + dx_l)
-    t_new = (tray.T + dx_t)
+    v_new = (tray.v + t * dx_v)
+    l_new = (tray.l + t * dx_l)
+    t_new = (tray.T + t * dx_t)
 
     v_new_final = jnp.where(v_new >= 0., v_new, tray.v
-                            * jnp.exp(dx_v / jnp.where(tray.v > 0, tray.v, 1e-10)))
+                            * jnp.exp(t * dx_v / jnp.where(tray.v > 0, tray.v, 1e-10)))
     l_new_final = jnp.where(l_new >= 0., l_new, tray.l
-                            * jnp.exp(dx_l / jnp.where(tray.l > 0, tray.l, 1e-10)))
-    t_new_final = jnp.where(t_new >= state.temperature_bounds[-1], state.temperature_bounds[-1],
-                            jnp.where(t_new <= state.temperature_bounds[0], state.temperature_bounds[0], t_new)) * jnp.where(tray.T > 0, 1, 0)
+                            * jnp.exp(t * dx_l / jnp.where(tray.l > 0, tray.l, 1e-10)))
+    t_new_final = jnp.where(t_new >= state.temperature_bounds[-1]*1.01, state.temperature_bounds[-1]*1.01,
+                            jnp.where(t_new <= state.temperature_bounds[0]*0.99, state.temperature_bounds[0]*0.99, t_new)) * jnp.where(tray.T > 0, 1, 0)
 
-    v_new_final = jnp.where(jnp.abs(dx_v) >= jnp.sum(tray.v), tray.v + tray.v * dx_v/jnp.abs(dx_v), v_new_final)
-    l_new_final = jnp.where(jnp.abs(dx_l) >= jnp.sum(tray.l), tray.l + tray.l * dx_v/jnp.abs(dx_l), l_new_final)
+    #v_new_final = jnp.where(v_new_final > jnp.sum(tray.v, axis=0), jnp.sum(tray.v), v_new_final)
+    #l_new_final = jnp.where(l_new_final > jnp.sum(tray.l, axis=0), jnp.sum(tray.l), l_new_final)
     state = state.replace(
         Y=jnp.nan_to_num(v_new_final / jnp.sum(v_new_final, axis=0)),
         X=jnp.nan_to_num(l_new_final / jnp.sum(l_new_final, axis=0)),
@@ -84,7 +87,7 @@ def x_initial(state: State):
     g = vmap(g_sol, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
                                                              tray_high,
                                                              jnp.arange(len(tray.T)))
-    state = state.replace(residuals=jnp.sum(g ** 2))
+    state = state.replace(EQU_residuals=jnp.nan_to_num(jnp.sum(g ** 2), nan=1e3))
 
     return state
 
@@ -92,12 +95,12 @@ def x_initial(state: State):
 def cond_fn(state):
     comps = jnp.sum(jnp.where(state.z > 0, 1, 0))
     cond = state.Nstages * (2 * comps + 1) * jnp.sum(state.F) * 1e-9
-    return (state.iterations < 20) & (state.residuals > cond)
+    return (state.EQU_iterations < 100) & (state.EQU_residuals > cond)
 
 
 def body_fn(state):
     state = x_initial(state)
-    state = state.replace(iterations=state.iterations+1)
+    state = state.replace(EQU_iterations=state.EQU_iterations+1)
     return state
 
 
@@ -115,7 +118,7 @@ def converge_equimolar(state: State):
 
 def scan_fn(state, _):
     state = x_initial(state)
-    state = nr_state_new.replace(iterations=state.iterations+1)
+    state = nr_state_new.replace(EQU_iterations=state.EQU_iterations+1)
     return state, None
 
 

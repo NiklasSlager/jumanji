@@ -39,7 +39,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             reflux_bound: Tuple[float, float] = (0.1, 10.),
             distillate_bound: Tuple[float, float] = (0.010, 0.990),
             feed_bound: Tuple[float, float] = (1.2, 3.),
-            step_limit: int = 6,
+            step_limit: int = 12,
 
     ):
         """Instantiates a `Snake` environment.
@@ -72,8 +72,8 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                 environment.
         """
 
-        feed = jnp.array([0.0, 0.0, 0.2, 0.23, 0.0, 0.21, 0.0, 0.15, 0.0, 0.11], dtype=float)
-        feed = feed/jnp.sum(feed) * jnp.array(1000., dtype=float)
+        feed = jnp.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], dtype=float)
+        feed = feed/jnp.sum(feed) * jnp.array(2000., dtype=float)
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))
         action_mask = jnp.array(

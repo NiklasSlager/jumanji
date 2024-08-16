@@ -116,7 +116,6 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                                    "action_C2.3": state.stream.flows[-1, 2, 2],
                                    "nr_product_streams": jnp.sum(jnp.max(state.stream.isproduct, axis=1)),
                                    "nr_columns": jnp.sum(state.overall_stream_actions),
-                                   "iterations": jnp.zeros((), dtype=int),
                                    "converged": jnp.zeros((), dtype=bool),
                                    "outflow": jnp.zeros((), dtype=float),
                                    #"action_mask": self._matrix_to_binary_integer(jnp.concatenate(jnp.int32(state.overall_stream_actions))),
@@ -189,8 +188,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                   "action_C2.3": next_state.stream.action[-1, -1, 2],
                   "nr_product_streams": jnp.sum(jnp.max(next_state.stream.isproduct, axis=1)),
                   "nr_columns": jnp.sum(state.overall_stream_actions),
-                  "iterations": column_state.NR_iterator,
-                  "converged": column_state.converged,
+                  "converged": column_state.converged,at
                   "outflow": jnp.sum(jnp.max(next_state.stream.isproduct*jnp.sum(next_state.stream.flows, axis=2), axis=1)),
                   #"action_mask": self._matrix_to_binary_integer(jnp.concatenate(jnp.int32(state.overall_stream_actions))),
                   #"product_mask": self._matrix_to_binary_integer(jnp.concatenate(state.stream.isproduct)),
@@ -399,8 +397,8 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                 jnp.int32(jnp.min(indices)), step].set(action).at[
                 jnp.int32(jnp.max(indices)), step].set(action),
             iterations=state.stream.iterations.at[
-                jnp.int32(jnp.min(indices)), step].set(column_state.NR_iterator).at[
-                jnp.int32(jnp.max(indices)), step].set(column_state.NR_iterator),
+                jnp.int32(jnp.min(indices)), step].set(column_state.NR_iterations).at[
+                jnp.int32(jnp.max(indices)), step].set(column_state.NR_iterations),
 
         )
         

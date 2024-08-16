@@ -83,7 +83,10 @@ class State:
     light_key: chex.Array
     heavy_spec: chex.Array
     light_spec: chex.Array
-    residuals: chex.Array
+    NR_residuals: chex.Array
+    EQU_residuals: chex.Array
     analytics: bool
     converged: bool
-    iterations: chex.Array
+    NR_iterations: chex.Array
+    EQU_iterations: chex.Array
+    BP_iterations: chex.Array

@@ -33,8 +33,17 @@ def bubble_point(state):
     '''
     #state_init = model_solver(state)
     state, iterators = initial_composition.converge_temperature(state)
-    #state = state.replace(X=(state_init.X*5+state.X)/6)
     state = functions.y_func(state)
+    state = functions.y_func(state)
+    state = state.replace(
+        Hliq=jnp.sum(vmap(thermo.liquid_enthalpy, in_axes=(0, None))(state.temperature,
+                                                                               state.components).transpose() * state.X,
+                     axis=0),
+        Hvap=jnp.sum(vmap(thermo.vapor_enthalpy, in_axes=(0, None))(state.temperature,
+                                                                              state.components).transpose() * state.Y,
+                     axis=0)
+    )
+    state = flowrates(state)
 
     return state
 
@@ -46,71 +55,113 @@ def x_initial(state: State):
                                                              tray_high,
                                                              jnp.arange(len(tray.T)))
     dx = jnp.nan_to_num(functions.thomas(a, b, c, -1 * g, state.Nstages))  # .reshape(-1,1)
-    def min_res(t, state, tray, dx):
-        dx_v = dx[:, :len(state.components)].transpose()
-        dx_l = dx[:, -len(state.components):].transpose()
-        dx_t = dx[:, len(state.components)].transpose()
 
-        v_new = (tray.v + t *  dx_v)
-        l_new = (tray.l + t * dx_l)
-        t_new = (tray.T + t * dx_t)
+    dx_v = dx[:, :len(state.components)].transpose()
+    dx_l = dx[:, -len(state.components):].transpose()
+    dx_t = dx[:, len(state.components)].transpose()
 
-        v_new_final = jnp.where(v_new >= 0., v_new, tray.v
-                                * jnp.exp(t * dx_v / jnp.where(tray.v > 0, tray.v, 1e-10)))
-        l_new_final = jnp.where(l_new >= 0., l_new, tray.l
-                                * jnp.exp(t * dx_l / jnp.where(tray.l > 0, tray.l, 1e-10)))
-        t_new_final = jnp.where(t_new >= state.temperature_bounds[-1], state.temperature_bounds[-1],
-                                jnp.where(t_new <= state.temperature_bounds[0], state.temperature_bounds[0], t_new)) * jnp.where(tray.T > 0, 1, 0)
+    v_new = (tray.v + dx_v)
+    l_new = (tray.l + dx_l)
+    t_new = (tray.T + dx_t)
 
-        state = state.replace(
-            Y=jnp.nan_to_num(v_new_final / jnp.sum(v_new_final, axis=0)),
-            X=jnp.nan_to_num(l_new_final / jnp.sum(l_new_final, axis=0)),
-            temperature=t_new_final,
-        )
+    v_new_final = jnp.where(v_new >= 0., v_new, tray.v
+                            * jnp.exp(dx_v / jnp.where(tray.v > 0, tray.v, 1e-10)))
+    l_new_final = jnp.where(l_new >= 0., l_new, tray.l
+                            * jnp.exp(dx_l / jnp.where(tray.l > 0, tray.l, 1e-10)))
+    t_new_final = jnp.where(t_new >= state.temperature_bounds[-1], state.temperature_bounds[-1],
+                            jnp.where(t_new <= state.temperature_bounds[0], state.temperature_bounds[0], t_new)) * jnp.where(tray.T > 0, 1, 0)
 
-        #state = matrix_transforms.trays_func(state)
-        tray_low, tray_high, tray = matrix_transforms.trays_func(state)
-        g = vmap(g_sol, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
-                                                                 tray_high,
-                                                                 jnp.arange(len(tray.T)))
+    v_new_final = jnp.where(jnp.abs(dx_v) >= jnp.sum(tray.v), tray.v + tray.v * dx_v/jnp.abs(dx_v), v_new_final)
+    l_new_final = jnp.where(jnp.abs(dx_l) >= jnp.sum(tray.l), tray.l + tray.l * dx_v/jnp.abs(dx_l), l_new_final)
+    state = state.replace(
+        Y=jnp.nan_to_num(v_new_final / jnp.sum(v_new_final, axis=0)),
+        X=jnp.nan_to_num(l_new_final / jnp.sum(l_new_final, axis=0)),
+        temperature=t_new_final,
+    )
 
-        return jnp.nan_to_num(jnp.sum(g ** 2), nan=1e10), state
+    #state = matrix_transforms.trays_func(state)
+    tray_low, tray_high, tray = matrix_transforms.trays_func(state)
+    g = vmap(g_sol, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
+                                                             tray_high,
+                                                             jnp.arange(len(tray.T)))
+    state = state.replace(residuals=jnp.sum(g ** 2))
 
-    carry = vmap(min_res, in_axes=(0, None, None, None))(jnp.arange(0.1, 1.1, 0.1), state, tray, dx)
-    result, states = carry
-    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.1, 1.1, 0.1), 0))
-
-    res, state_new = min_res(new_t, state, tray, dx)
-    return res, state_new
+    return state
 
 
-def cond_fn(args):
-    state, iterations, res = args
+def cond_fn(state):
     comps = jnp.sum(jnp.where(state.z > 0, 1, 0))
-    cond = state.Nstages * (2 * comps + 1) * jnp.sum(state.F) * 1e-8
-    return (iterations < 100) & (res > cond)
+    cond = state.Nstages * (2 * comps + 1) * jnp.sum(state.F) * 1e-9
+    return (state.iterations < 20) & (state.residuals > cond)
 
 
-def body_fn(args):
-    state, iterations, res = args
-    res_new, nr_state_new = x_initial(state)
-    nr_state_new = nr_state_new.replace(residuals=nr_state_new.residuals.at[iterations].set(res_new))
-    iterations += 1
-    return nr_state_new, iterations, res_new
+def body_fn(state):
+    state = x_initial(state)
+    state = state.replace(iterations=state.iterations+1)
+    return state
 
 
 def converge_equimolar(state: State):
     # nr_state = initialize_NR(state)x
 
-    iterations = 0
-    res = 0
-
-    state, iterations, res = (
+    state = (
         lax.while_loop(cond_fun=cond_fn, body_fun=body_fn,
-                       init_val=(state,
-                                 iterations,
-                                 jnp.array(10, dtype=float),
-                                 )
+                       init_val=state
                        )
     )
-    return state, iterations, res
+
+    return state
+
+
+def scan_fn(state, _):
+    state = x_initial(state)
+    state = nr_state_new.replace(iterations=state.iterations+1)
+    return state, None
+
+
+def scan_equimolar(state: State):
+    state, _ = lax.scan(f=scan_fn,
+             init=state,
+             xs=jnp.arange(20)
+             )
+    return state
+
+
+def flowrates(state: State):
+    vnew = jnp.zeros(len(state.V))
+    vnew = vnew.at[0].set(state.distillate)
+    vnew = vnew.at[1].set(state.V[0] + state.L[0] + state.U[0] - state.F[0])
+
+    def update_vnew(carry, j):
+        vnew, state = carry
+        mask = jnp.where(jnp.arange(len(state.temperature)) < j, 1, 0)
+        numerator = ((jnp.sum(state.F * mask - state.U * mask - state.W * mask) - state.V[0]) * (
+                    state.Hliq[j - 1] - state.Hliq[j]) - state.F[j] * (
+                             state.Hliq[j] - state.Hfeed[j])
+                     + state.W[j] * (state.Hvap[j] - state.Hliq[j])) - (state.Hvap[j] - state.Hliq[j - 1]) * vnew[j]
+        denominator = (state.Hliq[j] - state.Hvap[j + 1])
+        vnew = vnew.at[j + 1].set(numerator / denominator)
+        carry = vnew, state
+        return carry, None
+
+    carry_vnew, _ = jax.lax.scan(update_vnew, (vnew, state), jnp.arange(1, len(state.V)))
+    vnew, state = carry_vnew
+
+    lnew = jnp.zeros(len(state.L))
+
+    # lnew = lnew.at[0].set(state.RR * state.U[0])
+    # lnew = lnew.at[-1].set(state.bottom)
+
+    def update_lnew(carry, j):
+        lnew, state = carry
+        mask = jnp.where(jnp.arange(len(state.temperature)) < j+1, 1, 0)
+        lnew = lnew.at[j].set(vnew[j + 1] + jnp.sum(state.F * mask - state.U * mask - state.W * mask) - vnew[0])
+        carry = lnew, state
+        return carry, j
+
+    # lnew = vmap(update_lnew, in_axes=[0, None])(jnp.arange(1, len(state.L)-1), vnew)
+    carry_lnew, add = jax.lax.scan(update_lnew, (lnew, state), jnp.arange(1, len(state.L) - 1))
+    lnew, state = carry_lnew
+
+    mask = jnp.arange(len(state.V))
+    return state.replace(L=jnp.where((mask > 0) & (mask < state.Nstages-1), lnew, state.L), V=jnp.where((mask > 1) & (mask < state.Nstages), vnew, state.V))

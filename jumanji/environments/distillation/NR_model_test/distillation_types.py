@@ -86,3 +86,4 @@ class State:
     residuals: chex.Array
     analytics: bool
     converged: bool
+    iterations: chex.Array

@@ -42,10 +42,13 @@ def initialize():
         light_key=jnp.zeros((), dtype=int),
         heavy_spec=jnp.zeros((), dtype=float),
         light_spec=jnp.zeros((), dtype=float),
-        residuals=jnp.ones((), dtype=float),
+        NR_residuals=jnp.ones((), dtype=float),
+        EQU_residuals=jnp.ones((), dtype=float),
         analytics=jnp.zeros((), dtype=bool),
         converged=jnp.ones((), dtype=bool),
-        iterations=jnp.zeros((), dtype=int)
+        NR_iterations=jnp.zeros((), dtype=int),
+        EQU_iterations=jnp.zeros((), dtype=int),
+        BP_iterations=jnp.zeros((), dtype=int)
     )
 
 
@@ -145,13 +148,13 @@ def update_NR(state: State):
                                                                  tray_high,
                                                                  jnp.arange(len(tray.T)))
 
-        state = state.replace(residuals=jnp.sum(f ** 2))
+        state = state.replace(NR_residuals=jnp.nan_to_num(jnp.sum(f ** 2), nan=1e3))
 
         return state
 
 
     states = vmap(min_res, in_axes=(0, None, None, None))(jnp.arange(0.01, 1.1, 0.05), state, tray, dx)
-    result = states.residuals
+    result = states.NR_residuals
     new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.01, 1.1, 0.05), 0))
 
     state = min_res(new_t, state, tray, dx)
@@ -162,12 +165,12 @@ def update_NR(state: State):
 def cond_fn(state):
     comps = jnp.sum(jnp.where(state.z > 0, 1, 0))
     cond = state.Nstages * (2 * comps + 1) * jnp.sum(state.F) * 1e-9
-    return (state.iterations < 100) & (state.residuals > cond)
+    return (state.NR_iterations < 100) & (state.NR_residuals > cond)
 
 
 def body_fn(state):
     state = update_NR(state)
-    state = state.replace(iterations=state.iterations + 1)
+    state = state.replace(NR_iterations=state.NR_iterations + 1)
     return state
 
 
@@ -214,7 +217,7 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     state = initial_temperature(state)
 
     state = state.replace(Hfeed=jnp.where(state.F > 0, jnp.sum(thermodynamics.feed_enthalpy(state) * state.z), 0))
-    state = initial_composition.model_solver(state)
+    state = equimolar.bubble_point(state)
     state = functions.y_func(state)
     state = equimolar.converge_equimolar(state)
     state = converge_column(state)
@@ -230,6 +233,6 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     state = reboiler_duty(state)
     state = costing.tac(state)
     state = state.replace(
-        converged= jnp.asarray((state.residuals < state.Nstages * (2 * jnp.sum(jnp.where(state.z > 0, 1, 0)) + 1) * jnp.sum(state.F) * 1e-9) &
-                               (state.iterations < 100)))
+        converged= jnp.asarray((state.NR_residuals < state.Nstages * (2 * jnp.sum(jnp.where(state.z > 0, 1, 0)) + 1) * jnp.sum(state.F) * 1e-9) &
+                               (state.NR_iterations < 100)))
     return state

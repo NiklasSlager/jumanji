@@ -63,33 +63,34 @@ def model_solver(state: State):
 
 
 def cond_fn_temperature(args):
-    state, t_old, tol, iterations = args
+    state, t_old = args
+    tol = jnp.array(0.1, dtype=float)
     error = jnp.abs(state.temperature - t_old)
-    return (iterations < 25) & (jnp.any(error > tol))
+    return (state.BP_iterations < 100) & (jnp.any(error > tol))
 
 
 def body_fn_temperature(args):
-    state, t_old, tol, iterations = args
+    state, t_old = args
     t_old = state.temperature
     state = model_solver(state)
     state = functions.stage_temperature(state)
-    iterations += 1
-    return state, t_old, tol, iterations
+    state = state.replace(BP_iterations=state.BP_iterations + 1)
+    return state, t_old
 
 
 def converge_temperature(state: State):
-    tol = jnp.array(0.01, dtype=float)
-    state, t_old, tol, iterations = jax.lax.while_loop(
+
+    state, t_old = jax.lax.while_loop(
         cond_fn_temperature,
         body_fn_temperature,
-        (state, jnp.zeros_like(state.temperature, dtype=float), tol, 1)
+        (state, jnp.zeros_like(state.temperature, dtype=float))
     )
-    return state, iterations
+    return state
 
 
 
 def bubble_point(state):
-    state, iterators = converge_temperature(state)
+    state = converge_temperature(state)
     state = functions.y_func(state)
     state = state.replace(
         Hliq=jnp.sum(vmap(thermo.liquid_enthalpy, in_axes=(0, None))(state.temperature,

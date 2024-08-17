@@ -147,7 +147,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             distillate=column_input.distillate * feed,
             rr=column_input.reflux_ratio
         )
-        column_state = column_state.replace(converged = jnp.nan_to_num(column_state.converged)
+        column_state = column_state.replace(converged = jnp.nan_to_num(column_state.converged))
 
         next_state = self._stream_table_update(state, column_state, action)
         next_state = self._get_action_mask_stream(next_state)

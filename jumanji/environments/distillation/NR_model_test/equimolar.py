@@ -58,7 +58,7 @@ def x_initial(state: State):
                                                              jnp.arange(len(tray.T)))
     dx = jnp.nan_to_num(functions.thomas(a, b, c, -1 * g, state.Nstages))  # .reshape(-1,1)
 
-    t = jnp.array(1.0, dtype=float)
+    t = 1.
     dx_v = dx[:, :len(state.components)].transpose()
     dx_l = dx[:, -len(state.components):].transpose()
     dx_t = dx[:, len(state.components)].transpose()
@@ -68,25 +68,26 @@ def x_initial(state: State):
     t_new = (tray.T + t * dx_t)
 
     v_new_final = jnp.where(v_new >= 0., v_new, tray.v
-                            * jnp.exp(t * dx_v / jnp.where(tray.v > 0, tray.v, 1e-10)))
+                        * jnp.exp(t * dx_v / jnp.where(tray.v > 0, tray.v, 1e-10)))
     l_new_final = jnp.where(l_new >= 0., l_new, tray.l
-                            * jnp.exp(t * dx_l / jnp.where(tray.l > 0, tray.l, 1e-10)))
-    t_new_final = jnp.where(t_new >= state.temperature_bounds[-1]*1.01, state.temperature_bounds[-1]*1.01,
-                            jnp.where(t_new <= state.temperature_bounds[0]*0.99, state.temperature_bounds[0]*0.99, t_new)) * jnp.where(tray.T > 0, 1, 0)
+                        * jnp.exp(t * dx_l / jnp.where(tray.l > 0, tray.l, 1e-10)))
+    t_new_final = jnp.where(t_new >= state.temperature[state.Nstages-1] + 6. , state.temperature[state.Nstages-1] + 6.,
+                        jnp.where(t_new <= state.temperature[0] - 6., state.temperature[0] - 6., t_new)) * jnp.where(tray.T > 5, 1, 0)
 
     #v_new_final = jnp.where(v_new_final > jnp.sum(tray.v, axis=0), jnp.sum(tray.v), v_new_final)
     #l_new_final = jnp.where(l_new_final > jnp.sum(tray.l, axis=0), jnp.sum(tray.l), l_new_final)
+
     state = state.replace(
-        Y=jnp.nan_to_num(v_new_final / jnp.sum(v_new_final, axis=0)),
-        X=jnp.nan_to_num(l_new_final / jnp.sum(l_new_final, axis=0)),
-        temperature=t_new_final,
+    Y=jnp.nan_to_num(v_new_final / jnp.sum(v_new_final, axis=0), nan=1e-20),
+    X=jnp.nan_to_num(l_new_final / jnp.sum(l_new_final, axis=0), nan=1e-20),
+    temperature=t_new_final,
     )
 
     #state = matrix_transforms.trays_func(state)
     tray_low, tray_high, tray = matrix_transforms.trays_func(state)
     g = vmap(g_sol, in_axes=(None, None, None, None, 0))(state, tray_low, tray,
-                                                             tray_high,
-                                                             jnp.arange(len(tray.T)))
+                                                         tray_high,
+                                                         jnp.arange(len(tray.T)))
     state = state.replace(EQU_residuals=jnp.nan_to_num(jnp.sum(g ** 2), nan=1e3))
 
     return state

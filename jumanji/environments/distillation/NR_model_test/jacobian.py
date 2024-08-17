@@ -22,6 +22,9 @@ def e_function(state: State, tray_low, tray, tray_high, i, j):
     return ((tray.l[i]/jnp.sum(tray.l) * thermo.k_eq(tray.T, state.components[i], state.pressure) - tray.v[i]/jnp.sum(tray.v))) #*jnp.where(state.z > 0, 1, 0)[i]
 
 
+def e_function_simple(state: State, tray_low, tray, tray_high, i, j):
+    return ((tray.l[i]/jnp.sum(tray.l)*jnp.sum(tray.v) * thermo.k_eq(tray.T, state.components[i], state.pressure) - tray.v[i])) #*jnp.where(state.z > 0, 1, 0)[i]
+
 
 def h_function(state: State, tray_low, tray, tray_high, j):
     h_evap = thermo.h_evap(tray.T, 4)
@@ -67,7 +70,7 @@ def g_vector_function(state: State, tray_low, tray, tray_high, j):
     h = eqmol
     e = jnp.asarray(jnp.where(j < state.Nstages, vmap(e_function, in_axes=(None, None, None, None, 0, None))(state, tray_low, tray, tray_high, jnp.arange(len(state.components)), j), 0))
 
-    return Mesh(H=h,
+    return Mesh(H=h/(5*jnp.sum(state.F)),
                 M=m,
                 E=e,
                 )

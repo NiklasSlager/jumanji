@@ -86,7 +86,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         state = State(
             stream=stream,
             step_count=jnp.zeros((), dtype=int),
-            column_count=jnp.ones((), dtype=int),
+            column_count=jnp.zeros((), dtype=int),
             action_mask_stream=jnp.zeros((self._max_steps+1, self._max_steps+1), dtype=bool).at[0, 0].set(True),
             overall_stream_actions=jnp.zeros((self._max_steps + 1, self._max_steps + 1), dtype=bool).at[0, 0].set(True),
             action_mask_column=action_mask,
@@ -147,11 +147,11 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             distillate=column_input.distillate * feed,
             rr=column_input.reflux_ratio
         )
-        column_state = column_state.replace(converged = jnp.where(jnp.isnan(column_state.converged), False, column_state.converged))
+        column_state = column_state.replace(converged = jnp.nan_to_num(column_state.converged)
 
         next_state = self._stream_table_update(state, column_state, action)
         next_state = self._get_action_mask_stream(next_state)
-        reward = jnp.sum(next_state.stream.value[:, state.column_count])
+
         converged = jnp.asarray(((jnp.sum(column_state.V[0]) > 0) & (column_state.converged == 1)), dtype=int)
 
 
@@ -161,7 +161,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             overall_stream_actions=state.overall_stream_actions+next_state.action_mask_stream,
             key=N_key,
         )
-
+        reward = jnp.sum(next_state.stream.value[:, next_state.column_count])
         done = (next_state.step_count >= self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
 
         observation = self._state_to_observation(next_state)

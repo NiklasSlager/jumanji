@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 import jax
+from jaxopt import Bisection
 from jax import vmap, lax, jit
 from jumanji.environments.distillation.NR_model_test.distillation_types import State, Tray, Thermo
 from jumanji.environments.distillation.NR_model_test import functions, initial_composition, matrix_transforms, jacobian, \
@@ -44,7 +45,6 @@ def initialize():
         light_spec=jnp.zeros((), dtype=float),
         NR_residuals=jnp.ones((), dtype=float),
         EQU_residuals=jnp.ones((), dtype=float),
-        BP_residuals=jnp.ones((), dtype=float),
         analytics=jnp.zeros((), dtype=bool),
         converged=jnp.ones((), dtype=bool),
         NR_iterations=jnp.zeros((), dtype=int),
@@ -78,8 +78,7 @@ def initial_guess(state: State, nstages, feedstage, pressure, feed, z, distillat
 
 
 def initial_temperature(state: State):
-    t_range = functions.t_sat_solver(state.components, state.pressure)
-    t_minmax = jnp.where(state.z > 0, t_range, 0)
+
     t_split = jnp.concatenate(
         (jnp.zeros((), dtype=float)[None], jnp.diff(jnp.sort(jnp.where(state.z > 0, t_range, 0)))))
 
@@ -88,16 +87,45 @@ def initial_temperature(state: State):
 
     t_avg_index = jnp.sum(jnp.where(t_split == jnp.max(t_split), jnp.arange(len(t_split)), 0)) - 1
     t_avg = t_range[t_avg_index]
-    delta_t = t_split[t_avg_index + 1] / (state.Nstages-2)
+    delta_t = t_split[t_avg_index + 1] / (state.Nstages)
     t_avg = t_avg - t_split[t_avg_index + 1] / 2
 
-    min_t = jnp.min(jnp.where((t_minmax > 0) & (t_minmax != jnp.max(t_minmax)), t_minmax, jnp.max(t_minmax) - 1))
+
     return state.replace(
-        temperature=jnp.where(jnp.arange(len(state.temperature)) < state.Nstages,
-                              t_avg - jnp.arange(len(state.temperature))+5 * delta_t, 0),
+        #temperature=jnp.where(jnp.arange(len(state.temperature)) < state.Nstages,
+        #                      jnp.max(t_minmax) - t_split[t_avg_index + 1] + jnp.arange(len(state.temperature)) * delta_t, 0),
         temperature_bounds=jnp.array([jnp.min(min_t), jnp.max(t_minmax)])
     )
 
+
+def split_guess(state: State):
+    cum_z = jnp.cumsum(state.z)
+    bottoms = jnp.where((cum_z - state.distillate/jnp.sum(state.F)) > 0, cum_z - state.distillate/jnp.sum(state.F), 0)
+    non_zeros = jnp.where(bottoms>0, bottoms, 10)
+    bottoms = jnp.where((bottoms > jnp.min(non_zeros)) & (bottoms > 0), state.z, bottoms)
+    tops = state.z-bottoms
+    bottoms = bottoms / jnp.sum(bottoms)
+    tops = tops/jnp.sum(tops)
+    def function(tempcalc):
+        return 1 - jnp.sum(tops/vmap(thermodynamics.k_eq, in_axes=(None, 0, None))(tempcalc, state.components, state.pressure))
+    result = Bisection(optimality_fun=function, lower=500., upper=100., check_bracket=False).run(500.).params
+    x_tops = tops/vmap(thermodynamics.k_eq, in_axes=(None, 0, None))(result, state.components, state.pressure)
+
+    d_bottoms = bottoms/(state.Nstages-1)
+    d_tops = x_tops/(state.Nstages)
+    x_mask = jnp.tile(jnp.arange(len(state.temperature)), (len(state.z), 1))
+    x_hk = x_mask * d_bottoms[:, None]
+    x_lk = (state.Nstages - x_mask) * d_tops[:, None]
+    x_lk = jnp.where(x_lk > 0., x_lk, 0.)
+    x = (jnp.where(state.z[:, None] > 0, x_lk + x_hk, 0)*jnp.where(x_mask<state.Nstages, 1, 0))
+    state = state.replace(X=x/jnp.sum(x, axis=0))
+    state = functions.stage_temperature(state)
+    #state = state.replace(temperature=state.temperature[0] + (state.temperature[state.Nstages-1]-state.temperature[0])/(state.Nstages-1)*jnp.arange(len(state.temperature)))
+
+    t_range = functions.t_sat_solver(state.components, state.pressure)
+    t_minmax = jnp.where(state.z > 0, t_range, 0)
+    min_t = jnp.min(jnp.where((t_minmax > 0) & (t_minmax != jnp.max(t_minmax)), t_minmax, jnp.max(t_minmax) - 1))
+    return state.replace(temperature_bounds=jnp.array([jnp.min(min_t), jnp.max(t_minmax)]))
 
 def f_sol(state: State, tray_low, tray, tray_high, j):
     f_s = jacobian.f_vector_function(
@@ -130,17 +158,19 @@ def update_NR(state: State):
 
 
         v_new_final = jnp.where(v_new >= 0., v_new, tray.v
-                                * jnp.exp(dx_v / jnp.where(tray.v > 0, tray.v, 1e-10)))
+                                * jnp.exp(dx_v / jnp.where(tray.v > 0, tray.v, 1e-20)))
         l_new_final = jnp.where(l_new >= 0., l_new, tray.l
-                                * jnp.exp(dx_l / jnp.where(tray.l > 0, tray.l, 1e-10)))
-        t_new_final = jnp.where(t_new >= state.temperature_bounds[-1], state.temperature_bounds[-1],
-                                jnp.where(t_new <= state.temperature_bounds[0], state.temperature_bounds[0], t_new)) * jnp.where(tray.T > 0, 1, 0)
+                                * jnp.exp(dx_l / jnp.where(tray.l > 0, tray.l, 1e-20)))
+        t_new_final = jnp.where(t_new >= state.temperature[state.Nstages - 1] + 9.,
+                                state.temperature[state.Nstages - 1] + 9.,
+                                jnp.where(t_new <= state.temperature[0] - 9., state.temperature[0] - 9.,
+                                          t_new)) * jnp.where(tray.T > 0, 1, 0)
 
         state = state.replace(
             V=jnp.sum(v_new_final, axis=0),
             L=jnp.sum(l_new_final, axis=0),
-            Y=jnp.nan_to_num(v_new_final / jnp.sum(v_new_final, axis=0)),
-            X=jnp.nan_to_num(l_new_final / jnp.sum(l_new_final, axis=0)),
+            Y=jnp.nan_to_num(v_new_final / jnp.sum(v_new_final, axis=0), nan=1e-20),
+            X=jnp.nan_to_num(l_new_final / jnp.sum(l_new_final, axis=0), nan=1e-20),
             temperature=t_new_final,
         )
 
@@ -154,9 +184,9 @@ def update_NR(state: State):
         return state
 
 
-    states = vmap(min_res, in_axes=(0, None, None, None))(jnp.arange(0.01, 1.1, 0.05), state, tray, dx)
+    states = vmap(min_res, in_axes=(0, None, None, None))(jnp.arange(0.1, 1.1, 0.1), state, tray, dx)
     result = states.NR_residuals
-    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.01, 1.1, 0.05), 0))
+    new_t = jnp.max(jnp.where(result == jnp.min(result), jnp.arange(0.1, 1.1, 0.1), 0))
 
     state = min_res(new_t, state, tray, dx)
 
@@ -215,10 +245,12 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
                           distillate=distillate, rr=rr, analytics=analytics, specs=specs, heavy_recovery=heavy_recovery,
                           light_recovery=light_recovery)
 
-    state = initial_temperature(state)
+    state = split_guess(state)
+    state = functions.y_func(state)
+    #state = initial_temperature(state)
 
     state = state.replace(Hfeed=jnp.where(state.F > 0, jnp.sum(thermodynamics.feed_enthalpy(state) * state.z), 0))
-    state = equimolar.bubble_point(state)
+    #state = equimolar.bubble_point(state)
     state = equimolar.converge_equimolar(state)
     state = converge_column(state)
     state = state.replace(

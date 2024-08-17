@@ -347,7 +347,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
     def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array):
         product_prices = 0.10
         converged = jnp.asarray((jnp.nan_to_num(jnp.sum(column_state.V[0]))>0) & (column_state.converged==1))
-        step = state.column_count - (1-converged)
+        step = state.column_count - (1-converged) + 1
         state = state.replace(stream=state.stream.replace(
             flows=state.stream.flows.at[:, step].set(state.stream.flows[:, state.column_count - 1]),
             isproduct=state.stream.isproduct.at[:, step].set(state.stream.isproduct[:, state.column_count - 1])))
@@ -407,7 +407,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         )
 
     def _get_action_mask_stream(self, state: State):
-        step = state.column_count - jnp.array((1-jnp.max(state.stream.converged[:, state.column_count])), dtype=int)
+        step = state.column_count - jnp.array((1-jnp.max(state.stream.converged[:, state.column_count])), dtype=int) + 1
         step_mask = jnp.where((state.stream.isproduct[:, step] == 0)
                               & (jnp.triu(jnp.ones(state.action_mask_stream.shape, dtype=bool))[:, step]),
                               jnp.arange(1, len(state.stream.flows) + 1),

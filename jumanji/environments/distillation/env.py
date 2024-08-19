@@ -72,7 +72,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                 environment.
         """
 
-        feed = jnp.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], dtype=float)
+        feed = jnp.array([0.0, 0.0, 0.0, 0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0], dtype=float)
         feed = feed/jnp.sum(feed) * jnp.array(2000., dtype=float)
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))

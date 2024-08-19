@@ -39,7 +39,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             reflux_bound: Tuple[float, float] = (0.1, 10.),
             distillate_bound: Tuple[float, float] = (0.010, 0.990),
             feed_bound: Tuple[float, float] = (1.2, 3.),
-            step_limit: int = 3,
+            step_limit: int = 9,
 
     ):
         """Instantiates a `Snake` environment.
@@ -72,7 +72,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                 environment.
         """
 
-        feed = jnp.array([0.0, 0.0, 0.0, 0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0], dtype=float)
+        feed = jnp.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], dtype=float)
         feed = feed/jnp.sum(feed) * jnp.array(2000., dtype=float)
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))
@@ -86,7 +86,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         state = State(
             stream=stream,
             step_count=jnp.zeros((), dtype=int),
-            column_count=jnp.ones((), dtype=int),
+            column_count=jnp.zeros((), dtype=int),
             action_mask_stream=jnp.zeros((self._max_steps+1, self._max_steps+1), dtype=bool).at[0, 0].set(True),
             overall_stream_actions=jnp.zeros((self._max_steps + 1, self._max_steps + 1), dtype=bool).at[0, 0].set(True),
             action_mask_column=action_mask,
@@ -129,7 +129,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         # new_N = action+self.min_N
 
         column_input = self._action_to_column_spec(action)
-        feed_flow = state.stream.flows[:, state.column_count-1]*state.action_mask_stream[:, state.column_count-1][:, None]
+        feed_flow = state.stream.flows[:, state.column_count]*state.action_mask_stream[:, state.column_count][:, None]
         feed_flow = jnp.sum(feed_flow, axis=0)
         feed = jnp.sum(feed_flow)
         z = feed_flow / jnp.sum(feed_flow)
@@ -151,7 +151,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
         next_state = self._stream_table_update(state, column_state, action)
         next_state = self._get_action_mask_stream(next_state)
-        reward = jnp.sum(next_state.stream.value[:, state.column_count])
+
         converged = jnp.asarray(((jnp.sum(column_state.V[0]) > 0) & (column_state.converged == 1)), dtype=int)
 
 
@@ -161,7 +161,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             overall_stream_actions=state.overall_stream_actions+next_state.action_mask_stream,
             key=N_key,
         )
-        
+        reward = jnp.sum(next_state.stream.value[:, next_state.column_count])
         done = (next_state.step_count >= self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
 
         observation = self._state_to_observation(next_state)
@@ -308,7 +308,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         )
         '''
         
-        flows = jnp.sum(state.stream.flows[:, state.column_count-1]*state.action_mask_stream[:, state.column_count-1][:, None], axis=0)
+        flows = jnp.sum(state.stream.flows[:, state.column_count]*state.action_mask_stream[:, state.column_count][:, None], axis=0)
 
         return Observation(
             grid=jnp.nan_to_num(jnp.concatenate((flows/jnp.sum(flows), jnp.array([jnp.sum(flows)/jnp.array(2000., dtype=float)])))),
@@ -347,15 +347,15 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
     def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array):
         product_prices = 0.10
         converged = jnp.asarray((jnp.nan_to_num(jnp.sum(column_state.V[0]))>0) & (column_state.converged==1))
-        step = state.column_count - (1-converged)
+        step = state.column_count - (1-converged) + 1
         state = state.replace(stream=state.stream.replace(
-            flows=state.stream.flows.at[:, step].set(state.stream.flows[:, state.column_count-1]),
-            isproduct=state.stream.isproduct.at[:, step].set(state.stream.isproduct[:, state.column_count-1])))
+            flows=state.stream.flows.at[:, step].set(state.stream.flows[:, state.column_count]),
+            isproduct=state.stream.isproduct.at[:, step].set(state.stream.isproduct[:, state.column_count])))
         indices = jnp.where(
-            (state.stream.isproduct[:, state.column_count-1] == 0) & (state.stream.nr[:, state.column_count] > 0),
-            state.stream.nr[:, state.column_count],
+            (state.stream.isproduct[:, state.column_count] == 0) & (state.stream.nr[:, state.column_count+1] > 0),
+            state.stream.nr[:, state.column_count+1],
             jnp.max(state.stream.nr[:, state.column_count+1]) - 0.5
-        ) - state.stream.nr[:, state.column_count][0]
+        ) - state.stream.nr[:, state.column_count+1][0]
 
         bot_flow = jnp.nan_to_num(column_state.X[:, column_state.Nstages - 1] * (jnp.sum(column_state.F) - column_state.V[0]))
         #bot_flow = jnp.where(bot_flow <= jnp.array([200, 300, 500]), bot_flow, -10)
@@ -366,7 +366,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         top_flow_isproduct = self._is_product_stream(top_flow, converged)
         feedflows = state.stream.flows[(jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), state.column_count-1]
         real_flows = jnp.where(converged == True, jnp.array((top_flow, bot_flow)), feedflows)
-        column_cost = jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F), nan=-75/jnp.array(1000))
+        column_cost = jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F))
         column_cost = jnp.where(jnp.abs(column_cost) > 75, -75/jnp.array(1000.), column_cost)
         stream_table = state.stream.replace(
             flows=state.stream.flows.at[
@@ -407,7 +407,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         )
 
     def _get_action_mask_stream(self, state: State):
-        step = state.column_count - jnp.array((1-jnp.max(state.stream.converged[:, state.column_count])), dtype=int)
+        step = state.column_count - jnp.array((1-jnp.max(state.stream.converged[:, state.column_count+1])), dtype=int) + 1
         step_mask = jnp.where((state.stream.isproduct[:, step] == 0)
                               & (jnp.triu(jnp.ones(state.action_mask_stream.shape, dtype=bool))[:, step]),
                               jnp.arange(1, len(state.stream.flows) + 1),

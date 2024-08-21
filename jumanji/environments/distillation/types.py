@@ -32,6 +32,7 @@ class StreamSpec:
     reflux: chex.Array
     pressure: chex.Array
     stages: chex.Array
+    feed: chex.Array
     converged: chex.Array
     action: chex.Array
     iterations: chex.Array

@@ -5,6 +5,8 @@ from jumanji.environments.distillation.NR_model_test.distillation_types import S
 MW = jnp.array([44.09652,
                      58.1234,
                      58.1234,
+                ], dtype=float) # kg/kmol'
+'''
                      72.15028,
                      70.1344,
                      86.17716,
@@ -13,10 +15,12 @@ MW = jnp.array([44.09652,
                      114.23092,
                      114.23092
                      ], dtype=float) # kg/kmol
-
+    '''
 DENSITY = jnp.array([582.16062595505,
                      595.443221427136,
                      603.035386342418,
+], dtype=float)
+'''
                      611.258995343012,
                      718.953321022845,
                      615.501010415606,
@@ -25,7 +29,7 @@ DENSITY = jnp.array([582.16062595505,
                      615.56023902613,
                      613.127610604072
                      ], dtype=float)
-
+'''
 
 def diameter(state: State, l_s):
     r_gas = 8.314
@@ -93,7 +97,7 @@ def installed_cost(state: State):
 
 
 def operational_cost(state: State):
-    uptime = 8000
+    uptime = 1
     e_cd = uptime*state.CD/1000
     e_cost = jnp.array(1., dtype=float)
     cd_cost = e_cd*e_cost/1e6
@@ -105,4 +109,5 @@ def operational_cost(state: State):
 
 def tac(state: State):
     depreciation = jnp.array(5., dtype=float)  #years
-    return state.replace(TAC=(installed_cost(state)/depreciation + operational_cost(state)))
+    op_hr = 1000
+    return state.replace(TAC=(installed_cost(state)/(depreciation * op_hr) + operational_cost(state)))

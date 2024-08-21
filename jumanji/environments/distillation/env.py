@@ -38,7 +38,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             pressure_bound: Tuple[float, float] = (1, 10),
             reflux_bound: Tuple[float, float] = (0.1, 10.),
             distillate_bound: Tuple[float, float] = (0.010, 0.990),
-            feed_bound: Tuple[float, float] = (1.2, 3.),
+            feed_bound: Tuple[float, float] = (1.2, 5.),
             step_limit: int = 2,
 
     ):
@@ -72,14 +72,14 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                 environment.
         """
 
-        feed = jnp.array([0.1, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0, 0., 0.0, 0.], dtype=float)
+        feed = jnp.array([0.2, 0.5, 0.3,], dtype=float)
         feed = feed/jnp.sum(feed) * jnp.array(2000., dtype=float)
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))
         action_mask = jnp.array(
             (jnp.concatenate((jnp.ones(81, dtype=bool), jnp.zeros(69, dtype=bool))),
              #jnp.concatenate((jnp.ones(65, dtype=bool), jnp.zeros(35, dtype=bool))),
-             jnp.concatenate((jnp.ones(100, dtype=bool), jnp.zeros(50, dtype=bool))),
+             jnp.concatenate((jnp.ones(30, dtype=bool), jnp.zeros(120, dtype=bool))),
              jnp.ones(150,dtype=bool),
              jnp.concatenate((jnp.ones(30, dtype=bool), jnp.zeros(120, dtype=bool)))
              ))
@@ -100,6 +100,8 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                                    "stages_C1": jnp.zeros_like(state.stream.stages[0,0]), "stages_C2": jnp.zeros_like(state.stream.stages[0,0]),
                                    "pressure_C1": jnp.zeros_like(state.stream.stages[0,0]), "pressure_C2": jnp.zeros_like(state.stream.stages[0,0]),
                                    "reflux_C1": jnp.zeros_like(state.stream.stages[0,0]), "reflux_C2": jnp.zeros_like(state.stream.stages[0,0]),
+                                   "feed_C1": jnp.zeros_like(state.stream.stages[0, 0]),
+                                   "feed_C2": jnp.zeros_like(state.stream.stages[0, 0]),
                                    "distillate_C1": jnp.zeros_like(state.stream.stages[0,0]),
                                    "distillate_C1.1": state.stream.flows[0, 1, 0],
                                    "distillate_C1.2": state.stream.flows[0, 1, 1],
@@ -161,17 +163,18 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             overall_stream_actions=state.overall_stream_actions+next_state.action_mask_stream,
             key=N_key,
         )
-        reward = jnp.sum(next_state.stream.value[:, next_state.column_count])/50.
+        reward = jnp.sum(next_state.stream.value[:, next_state.column_count]) * 1000.
         done = (next_state.step_count >= self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
 
         observation = self._state_to_observation(next_state)
 
         #x_column, y_column, products, level_step = self._get_flowchart_configuration(state)
-        
         extras = {"reward": reward,
                   "stages_C1": next_state.stream.stages[0, 1], "stages_C2": next_state.stream.stages[2, 2],
                   "pressure_C1": next_state.stream.pressure[0, 1], "pressure_C2": next_state.stream.pressure[2, 2],
                   "reflux_C1": next_state.stream.reflux[0, 1], "reflux_C2": next_state.stream.reflux[2, 2],
+                  "feed_C1": next_state.stream.feed[0, 1],
+                  "feed_C2": next_state.stream.feed[2, 2],
                   "distillate_C1": jnp.sum(next_state.stream.flows[0, 1]),
                   "distillate_C1.1": next_state.stream.flows[0, 1, 0],
                   "distillate_C1.2": next_state.stream.flows[0, 1, 1],
@@ -223,7 +226,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         """
 
         grid = specs.BoundedArray(
-            shape=(11,),
+            shape=(4,),
             minimum=0.0,
             maximum=1.0,
             dtype=float,
@@ -287,7 +290,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
         new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 80]), jnp.array(self._stage_bounds)))
         #new_P = jnp.interp(action_P, jnp.array([0, 10]), jnp.array(self._pressure_bounds))
-        new_RR = jnp.interp(action_RR, jnp.array([0, 99]), jnp.array(self._reflux_bounds))
+        new_RR = jnp.interp(action_RR, jnp.array([0, 29]), jnp.array(self._reflux_bounds))
         new_D = jnp.interp(action_D, jnp.array([0, 149]), jnp.array(self._distillate_bounds))
         new_F = jnp.interp(action_F, jnp.array([0, 29]), jnp.array(self._feed_bounds))
 
@@ -332,6 +335,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             value=value,
             isproduct=jnp.zeros((matsize, matsize)),
             reflux=jnp.zeros((matsize, matsize)),
+            feed=jnp.zeros((matsize, matsize)),
             pressure=jnp.zeros((matsize, matsize)),
             stages=jnp.zeros((matsize, matsize)),
             converged=jnp.zeros((matsize, matsize)),
@@ -345,7 +349,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
 
     def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array):
-        product_prices = 0.10
+        product_prices = 0.1/1e4
         converged = jnp.asarray((jnp.nan_to_num(jnp.sum(column_state.V[0]))>0) & (column_state.converged==1))
         step = state.column_count - (1-converged) + 1
         state = state.replace(stream=state.stream.replace(
@@ -367,7 +371,8 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         feedflows = state.stream.flows[(jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), state.column_count-1]
         real_flows = jnp.where(converged == True, jnp.array((top_flow, bot_flow)), feedflows)
         column_cost = jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F))
-        column_cost = jnp.where(jnp.abs(column_cost) > 75, -75/jnp.array(1000.), column_cost)
+        column_cost = jnp.where(jnp.abs(column_cost) > 45/8000, -45/8000/jnp.array(1000.), column_cost)
+        feed_loc = jnp.max(jnp.where(column_state.F>0, jnp.arange(len(column_state.V)), 0))
         stream_table = state.stream.replace(
             flows=state.stream.flows.at[
                 (jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), step].set(
@@ -390,6 +395,9 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             stages=state.stream.stages.at[
                       jnp.int32(jnp.min(indices)), step].set(column_state.Nstages).at[
                       jnp.int32(jnp.max(indices)), step].set(column_state.Nstages),
+            feed=state.stream.stages.at[
+                      jnp.int32(jnp.min(indices)), step].set(feed_loc).at[
+                      jnp.int32(jnp.max(indices)), step].set(feed_loc),
             converged=state.stream.converged.at[
                       jnp.int32(jnp.min(indices)), step].set(converged).at[
                       jnp.int32(jnp.max(indices)), step].set(converged),

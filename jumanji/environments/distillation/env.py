@@ -395,7 +395,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             stages=state.stream.stages.at[
                       jnp.int32(jnp.min(indices)), step].set(column_state.Nstages).at[
                       jnp.int32(jnp.max(indices)), step].set(column_state.Nstages),
-            feed=state.stream.stages.at[
+            feed=state.stream.feed.at[
                       jnp.int32(jnp.min(indices)), step].set(feed_loc).at[
                       jnp.int32(jnp.max(indices)), step].set(feed_loc),
             converged=state.stream.converged.at[

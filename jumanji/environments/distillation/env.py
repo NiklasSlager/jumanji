@@ -39,7 +39,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             reflux_bound: Tuple[float, float] = (0.1, 10.),
             distillate_bound: Tuple[float, float] = (0.010, 0.990),
             feed_bound: Tuple[float, float] = (1.2, 5.),
-            step_limit: int = 2,
+            step_limit: int = 9,
 
     ):
         """Instantiates a `Snake` environment.
@@ -72,14 +72,14 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
                 environment.
         """
 
-        feed = jnp.array([0.2, 0.5, 0.3,], dtype=float)
+        feed = jnp.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], dtype=float)
         feed = feed/jnp.sum(feed) * jnp.array(2000., dtype=float)
         stream = self._stream_table_reset(self._max_steps+1, len(feed))
         stream = stream.replace(flows=stream.flows.at[0, 0].set(feed))
         action_mask = jnp.array(
             (jnp.concatenate((jnp.ones(81, dtype=bool), jnp.zeros(69, dtype=bool))),
              #jnp.concatenate((jnp.ones(65, dtype=bool), jnp.zeros(35, dtype=bool))),
-             jnp.concatenate((jnp.ones(30, dtype=bool), jnp.zeros(120, dtype=bool))),
+             jnp.concatenate((jnp.ones(50, dtype=bool), jnp.zeros(120, dtype=bool))),
              jnp.ones(150,dtype=bool),
              jnp.concatenate((jnp.ones(30, dtype=bool), jnp.zeros(120, dtype=bool)))
              ))
@@ -290,7 +290,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
         new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 80]), jnp.array(self._stage_bounds)))
         #new_P = jnp.interp(action_P, jnp.array([0, 10]), jnp.array(self._pressure_bounds))
-        new_RR = jnp.interp(action_RR, jnp.array([0, 29]), jnp.array(self._reflux_bounds))
+        new_RR = jnp.interp(action_RR, jnp.array([0, 49]), jnp.array(self._reflux_bounds))
         new_D = jnp.interp(action_D, jnp.array([0, 149]), jnp.array(self._distillate_bounds))
         new_F = jnp.interp(action_F, jnp.array([0, 29]), jnp.array(self._feed_bounds))
 

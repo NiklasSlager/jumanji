@@ -5,12 +5,13 @@ from jumanji.environments.distillation.NR_model_test.distillation_types import S
 MW = jnp.array([44.09652,
                      58.1234,
                      58.1234,
-                ], dtype=float) # kg/kmol'
-'''
                      72.15028,
                      70.1344,
                      86.17716,
                      100.20404,
+                ], dtype=float) # kg/kmol'
+'''
+
                      100.20404,
                      114.23092,
                      114.23092
@@ -19,12 +20,12 @@ MW = jnp.array([44.09652,
 DENSITY = jnp.array([582.16062595505,
                      595.443221427136,
                      603.035386342418,
-], dtype=float)
-'''
                      611.258995343012,
                      718.953321022845,
                      615.501010415606,
                      639.116574979533,
+                     ], dtype=float)
+'''
                      614.978050422831,
                      615.56023902613,
                      613.127610604072

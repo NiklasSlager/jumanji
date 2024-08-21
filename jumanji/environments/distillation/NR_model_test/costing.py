@@ -11,7 +11,6 @@ MW = jnp.array([44.09652,
                      100.20404,
                 ], dtype=float) # kg/kmol'
 '''
-
                      100.20404,
                      114.23092,
                      114.23092
@@ -24,8 +23,9 @@ DENSITY = jnp.array([582.16062595505,
                      718.953321022845,
                      615.501010415606,
                      639.116574979533,
-                     ], dtype=float)
+], dtype=float)
 '''
+                     
                      614.978050422831,
                      615.56023902613,
                      613.127610604072
@@ -63,7 +63,7 @@ def column_instalcost(state: State, ms):
     f_p = 1
     column_cost = ms/280*937.64*d_column**1.066*height**0.802*f_m*f_p
 
-    f_s = 1.4
+    f_s = 1.0
     f_t = 0
     f_m = 0
     internals_cost = ms/280*97.24*d_column**1.55*(spacing*state.Nstages)*(f_s + f_t + f_m)
@@ -91,7 +91,7 @@ def hex_instalcost(state: State, ms):
 
 
 def installed_cost(state: State):
-    ms = jnp.array(2971.6, dtype=float)
+    ms = jnp.array(2975.0, dtype=float)
     cost_eqp = (column_instalcost(state, ms) + hex_instalcost(state, ms))/1e6
     f_lang = jnp.array(5., dtype=float)
     return cost_eqp*f_lang

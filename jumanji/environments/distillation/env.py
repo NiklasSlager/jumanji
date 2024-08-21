@@ -79,7 +79,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         action_mask = jnp.array(
             (jnp.concatenate((jnp.ones(81, dtype=bool), jnp.zeros(69, dtype=bool))),
              #jnp.concatenate((jnp.ones(65, dtype=bool), jnp.zeros(35, dtype=bool))),
-             jnp.concatenate((jnp.ones(50, dtype=bool), jnp.zeros(120, dtype=bool))),
+             jnp.concatenate((jnp.ones(30, dtype=bool), jnp.zeros(120, dtype=bool))),
              jnp.ones(150,dtype=bool),
              jnp.concatenate((jnp.ones(30, dtype=bool), jnp.zeros(120, dtype=bool)))
              ))
@@ -290,7 +290,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
         new_N = jnp.int32(jnp.interp(action_N, jnp.array([0, 80]), jnp.array(self._stage_bounds)))
         #new_P = jnp.interp(action_P, jnp.array([0, 10]), jnp.array(self._pressure_bounds))
-        new_RR = jnp.interp(action_RR, jnp.array([0, 49]), jnp.array(self._reflux_bounds))
+        new_RR = jnp.interp(action_RR, jnp.array([0, 29]), jnp.array(self._reflux_bounds))
         new_D = jnp.interp(action_D, jnp.array([0, 149]), jnp.array(self._distillate_bounds))
         new_F = jnp.interp(action_F, jnp.array([0, 29]), jnp.array(self._feed_bounds))
 

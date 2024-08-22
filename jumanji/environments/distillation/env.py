@@ -349,7 +349,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
 
     def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array):
-        product_prices = 0.1/1e4
+        product_prices = 0.5/1e4
         converged = jnp.asarray((jnp.nan_to_num(jnp.sum(column_state.V[0]))>0) & (column_state.converged==1))
         step = state.column_count - (1-converged) + 1
         state = state.replace(stream=state.stream.replace(

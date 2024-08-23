@@ -196,7 +196,7 @@ def update_NR(state: State):
 def cond_fn(state):
     comps = jnp.sum(jnp.where(state.z > 0, 1, 0))
     cond = state.Nstages * (2 * comps + 1) * jnp.sum(state.F) * 1e-9
-    return (state.NR_iterations < 100) & (state.NR_residuals > cond)
+    return (state.NR_iterations < 25) & (state.NR_residuals > cond)
 
 
 def body_fn(state):

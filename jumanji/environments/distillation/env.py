@@ -185,7 +185,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             overall_stream_actions=state.overall_stream_actions+next_state.action_mask_stream,
             key=N_key,
         )
-        reward = jnp.sum(next_state.stream.value[:, next_state.column_count]) * 100.
+        reward = jnp.sum(next_state.stream.value[:, next_state.column_count]) * 500.
         done = (next_state.step_count >= self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
 
         observation = self._state_to_observation(next_state)

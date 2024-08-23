@@ -94,56 +94,34 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         )
         # output = simulation(N_reset)
         reward = jnp.array(-50, dtype=float)
-        '''"stages_C1":  jnp.zeros((), dtype=float),
-                                            "stages_C2": jnp.zeros((), dtype=float),
-                                            "stages_C3": jnp.zeros((), dtype=float),
-                                            "stages_C4": jnp.zeros((), dtype=float),
-                                            "stages_C5": jnp.zeros((), dtype=float),
-                                            "stages_C6": jnp.zeros((), dtype=float),
-        
-                                            "reflux_C1": jnp.zeros((), dtype=float),
-                                            "reflux_C2": jnp.zeros((), dtype=float),
-                                            "reflux_C3": jnp.zeros((), dtype=float),
-                                            "reflux_C4": jnp.zeros((), dtype=float),
-                                            "reflux_C5": jnp.zeros((), dtype=float),
-                                            "reflux_C6": jnp.zeros((), dtype=float),
-        
-                                            "feed_C1": jnp.zeros((), dtype=float),
-                                            "feed_C2": jnp.zeros((), dtype=float),
-                                            "feed_C3": jnp.zeros((), dtype=float),
-                                            "feed_C4": jnp.zeros((), dtype=float),
-                                            "feed_C5": jnp.zeros((), dtype=float),
-                                            "feed_C6": jnp.zeros((), dtype=float),
-        
-                                            "Distillate_C1": jnp.zeros((), dtype=float),
-                                            "Distillate_C2": jnp.zeros((), dtype=float),
-                                            "Distillate_C3": jnp.zeros((), dtype=float),
-                                            "Distillate_C4": jnp.zeros((), dtype=float),
-                                            "Distillate_C5": jnp.zeros((), dtype=float),
-                                            "Distillate_C6": jnp.zeros((), dtype=float),
-        
-                                            "O1": jnp.sum(state.stream.flows[0, -1]),
-                                            "O2": jnp.sum(state.stream.flows[1, -1]),
-                                            "O3": jnp.sum(state.stream.flows[2, -1]),
-                                            "O4": jnp.sum(state.stream.flows[3, -1]),
-                                            "O5": jnp.sum(state.stream.flows[4, -1]),
-                                            "O6": jnp.sum(state.stream.flows[5, -1]),
-                                            "O7": jnp.sum(state.stream.flows[6, -1]),
-        
-                                            "P1": jnp.max(state.stream.flows[0, -1])/jnp.sum(state.stream.flows[0, -1]),
-                                            "P2": jnp.max(state.stream.flows[1, -1])/jnp.sum(state.stream.flows[1, -1]),
-                                            "P3": jnp.max(state.stream.flows[2, -1])/jnp.sum(state.stream.flows[2, -1]),
-                                            "P4": jnp.max(state.stream.flows[3, -1])/jnp.sum(state.stream.flows[3, -1]),
-                                            "P5": jnp.max(state.stream.flows[4, -1])/jnp.sum(state.stream.flows[4, -1]),
-                                            "P6": jnp.max(state.stream.flows[5, -1])/jnp.sum(state.stream.flows[5, -1]),
-                                            "P7": jnp.max(state.stream.flows[6, -1])/jnp.sum(state.stream.flows[6, -1]),
-        
-                                            
-                                            "nr_columns": jnp.sum(state.overall_stream_actions),
-                                            "converged": jnp.sum(state.stream.converged), '''
+
         timestep = restart(observation=self._state_to_observation(state),
-                           extras={"nr_product_streams": jnp.sum(jnp.max(state.stream.isproduct, axis=1)),
-                                    "outflow": jnp.sum(jnp.max(state.stream.isproduct*jnp.sum(state.stream.flows, axis=2), axis=1)),
+                           extras={"reward": reward,
+                                   "stages_C1": jnp.zeros_like(state.stream.stages[0,0]), "stages_C2": jnp.zeros_like(state.stream.stages[0,0]),
+                                   "pressure_C1": jnp.zeros_like(state.stream.stages[0,0]), "pressure_C2": jnp.zeros_like(state.stream.stages[0,0]),
+                                   "reflux_C1": jnp.zeros_like(state.stream.stages[0,0]), "reflux_C2": jnp.zeros_like(state.stream.stages[0,0]),
+                                   "feed_C1": jnp.zeros_like(state.stream.stages[0, 0]),
+                                   "feed_C2": jnp.zeros_like(state.stream.stages[0, 0]),
+                                   "distillate_C1": jnp.zeros_like(state.stream.stages[0,0]),
+                                   "distillate_C1.1": state.stream.flows[0, 1, 0],
+                                   "distillate_C1.2": state.stream.flows[0, 1, 1],
+                                   "distillate_C1.3": state.stream.flows[0, 1, 2],
+                                   "bottom_C2": jnp.zeros_like(state.stream.stages[0, 0]),
+                                   "bottom_C2.1": state.stream.flows[0, 1, 0],
+                                   "bottom_C2.2": state.stream.flows[0, 1, 1],
+                                   "bottom_C2.3": state.stream.flows[0, 1, 2],
+                                   "action_C1.1": state.stream.flows[0, 1, 0],
+                                   "action_C1.2": state.stream.flows[0, 1, 1],
+                                   "action_C1.3": state.stream.flows[0, 1, 2],
+                                   "action_C2.1": state.stream.flows[-1, 2, 0],
+                                   "action_C2.2": state.stream.flows[-1, 2, 1],
+                                   "action_C2.3": state.stream.flows[-1, 2, 2],
+                                   "nr_product_streams": jnp.sum(jnp.max(state.stream.isproduct, axis=1)),
+                                   "nr_columns": jnp.sum(state.overall_stream_actions),
+                                   "converged": jnp.zeros((), dtype=bool),
+                                   "outflow": jnp.zeros((), dtype=float),
+                                   #"action_mask": self._matrix_to_binary_integer(jnp.concatenate(jnp.int32(state.overall_stream_actions))),
+                                   #"product_mask": self._matrix_to_binary_integer(jnp.concatenate(state.stream.isproduct)),
                                    })
 
         return state, timestep
@@ -185,61 +163,38 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
             overall_stream_actions=state.overall_stream_actions+next_state.action_mask_stream,
             key=N_key,
         )
-        reward = jnp.sum(next_state.stream.value[:, next_state.column_count]) * 500.
+        reward = jnp.sum(next_state.stream.value[:, next_state.column_count]) * 1000.
         done = (next_state.step_count >= self._max_steps) | (jnp.max(state.action_mask_stream) == 0)
 
         observation = self._state_to_observation(next_state)
 
         #x_column, y_column, products, level_step = self._get_flowchart_configuration(state)
-        '''"stages_C1": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 0] == 1, next_state.stream.stages[:, 1], 0)),
-                  "stages_C2": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 1] == 1, next_state.stream.stages[:, 2], 0)),
-                  "stages_C3": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 2] == 1, next_state.stream.stages[:, 3], 0)),
-                  "stages_C4": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 3] == 1, next_state.stream.stages[:, 4], 0)),
-                  "stages_C5": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 4] == 1, next_state.stream.stages[:, 5], 0)),
-                  "stages_C6": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 5] == 1, next_state.stream.stages[:, 6], 0)),
-
-                  "reflux_C1": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 0] == 1, next_state.stream.reflux[:, 1], 0)),
-                  "reflux_C2": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 1] == 1, next_state.stream.reflux[:, 2], 0)),
-                  "reflux_C3": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 2] == 1, next_state.stream.reflux[:, 3], 0)),
-                  "reflux_C4": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 3] == 1, next_state.stream.reflux[:, 4], 0)),
-                  "reflux_C5": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 4] == 1, next_state.stream.reflux[:, 5], 0)),
-                  "reflux_C6": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 5] == 1, next_state.stream.reflux[:, 6], 0)),
-
-                  "feed_C1": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 0] == 1, next_state.stream.feed[:, 1], 0)),
-                  "feed_C2": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 1] == 1, next_state.stream.feed[:, 2], 0)),
-                  "feed_C3": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 2] == 1, next_state.stream.feed[:, 3], 0)),
-                  "feed_C4": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 3] == 1, next_state.stream.feed[:, 4], 0)),
-                  "feed_C5": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 4] == 1, next_state.stream.feed[:, 5], 0)),
-                  "feed_C6": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 5] == 1, next_state.stream.feed[:, 6], 0)),
-
-                  "Distillate_C1": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 0] == 1, jnp.sum(next_state.stream.flows[:, 1], axis=1), 0)),
-                  "Distillate_C2": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 1] == 1, jnp.sum(next_state.stream.flows[:, 2], axis=1), 0)),
-                  "Distillate_C3": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 2] == 1, jnp.sum(next_state.stream.flows[:, 3], axis=1), 0)),
-                  "Distillate_C4": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 3] == 1, jnp.sum(next_state.stream.flows[:, 4], axis=1), 0)),
-                  "Distillate_C5": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 4] == 1, jnp.sum(next_state.stream.flows[:, 5], axis=1), 0)),
-                  "Distillate_C6": jnp.sum(jnp.where(next_state.overall_stream_actions[:, 5] == 1, jnp.sum(next_state.stream.flows[:, 6], axis=1), 0)),
-
-                  "O1": jnp.sum(next_state.stream.flows[0, -1]),
-                  "O2": jnp.sum(next_state.stream.flows[1, -1]),
-                  "O3": jnp.sum(next_state.stream.flows[2, -1]),
-                  "O4": jnp.sum(next_state.stream.flows[3, -1]),
-                  "O5": jnp.sum(next_state.stream.flows[4, -1]),
-                  "O6": jnp.sum(next_state.stream.flows[5, -1]),
-                  "O7": jnp.sum(next_state.stream.flows[6, -1]),
-
-                  "P1": jnp.max(next_state.stream.flows[0, -1])/jnp.sum(next_state.stream.flows[0, -1]),
-                  "P2": jnp.max(next_state.stream.flows[1, -1])/jnp.sum(next_state.stream.flows[1, -1]),
-                  "P3": jnp.max(next_state.stream.flows[2, -1])/jnp.sum(next_state.stream.flows[2, -1]),
-                  "P4": jnp.max(next_state.stream.flows[3, -1])/jnp.sum(next_state.stream.flows[3, -1]),
-                  "P5": jnp.max(next_state.stream.flows[4, -1])/jnp.sum(next_state.stream.flows[4, -1]),
-                  "P6": jnp.max(next_state.stream.flows[5, -1])/jnp.sum(next_state.stream.flows[5, -1]),
-                  "P7": jnp.max(next_state.stream.flows[6, -1])/jnp.sum(next_state.stream.flows[6, -1]),
-
+        extras = {"reward": reward,
+                  "stages_C1": next_state.stream.stages[0, 1], "stages_C2": next_state.stream.stages[2, 2],
+                  "pressure_C1": next_state.stream.pressure[0, 1], "pressure_C2": next_state.stream.pressure[2, 2],
+                  "reflux_C1": next_state.stream.reflux[0, 1], "reflux_C2": next_state.stream.reflux[2, 2],
+                  "feed_C1": next_state.stream.feed[0, 1],
+                  "feed_C2": next_state.stream.feed[2, 2],
+                  "distillate_C1": jnp.sum(next_state.stream.flows[0, 1]),
+                  "distillate_C1.1": next_state.stream.flows[0, 1, 0],
+                  "distillate_C1.2": next_state.stream.flows[0, 1, 1],
+                  "distillate_C1.3": next_state.stream.flows[0, 1, 2],
+                  "bottom_C2": jnp.sum(next_state.stream.flows[2, 2]),
+                  "bottom_C2.1": next_state.stream.flows[-1, -1, 0],
+                  "bottom_C2.2": next_state.stream.flows[-1, -1, 1],
+                  "bottom_C2.3": next_state.stream.flows[-1, -1, 2],
+                  "action_C1.1": next_state.stream.action[0, 1, 0],
+                  "action_C1.2": next_state.stream.action[0, 1, 1],
+                  "action_C1.3": next_state.stream.action[0, 1, 2],
+                  "action_C2.1": next_state.stream.action[-1, -1, 0],
+                  "action_C2.2": next_state.stream.action[-1, -1, 1],
+                  "action_C2.3": next_state.stream.action[-1, -1, 2],
                   "nr_product_streams": jnp.sum(jnp.max(next_state.stream.isproduct, axis=1)),
                   "nr_columns": jnp.sum(state.overall_stream_actions),
-                  "converged": jnp.sum(state.stream.converged),'''
-        extras = {"nr_product_streams": jnp.sum(jnp.max(next_state.stream.isproduct, axis=1)),
+                  "converged": column_state.converged,
                   "outflow": jnp.sum(jnp.max(next_state.stream.isproduct*jnp.sum(next_state.stream.flows, axis=2), axis=1)),
+                  #"action_mask": self._matrix_to_binary_integer(jnp.concatenate(jnp.int32(state.overall_stream_actions))),
+                  #"product_mask": self._matrix_to_binary_integer(jnp.concatenate(state.stream.isproduct)),
                   }
 
                   

@@ -392,7 +392,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
 
     def _is_product_stream(self, mole_flow: chex.Array, converged: chex.Scalar):
-        return ((jnp.max(mole_flow / jnp.sum(mole_flow)) > 0.95) | (jnp.sum(mole_flow) < 10)) & (converged == True) & (jnp.sum(column_state.F > 0))
+        return ((jnp.max(mole_flow / jnp.sum(mole_flow)) > 0.95) | (jnp.sum(mole_flow) < 10)) & (converged == True) & (jnp.sum(mole_flow > 0))
 
 
     def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array):

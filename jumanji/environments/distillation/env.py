@@ -177,7 +177,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         next_state = self._stream_table_update(state, column_state, action)
         next_state = self._get_action_mask_stream(next_state)
 
-        converged = jnp.asarray(((jnp.sum(column_state.V[0]) > 0) & (column_state.converged == 1)), dtype=int)
+        converged = jnp.asarray(((jnp.sum(feed) > 0) & (column_state.converged == 1)), dtype=int)
 
 
         next_state = next_state.replace(
@@ -392,12 +392,12 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
 
     def _is_product_stream(self, mole_flow: chex.Array, converged: chex.Scalar):
-        return ((jnp.max(mole_flow / jnp.sum(mole_flow)) > 0.95) | (jnp.sum(mole_flow) < 10)) & (converged == True)
+        return ((jnp.max(mole_flow / jnp.sum(mole_flow)) > 0.95) | (jnp.sum(mole_flow) < 10)) & (converged == True) & (jnp.sum(column_state.F > 0))
 
 
     def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array):
-        product_prices = 0.4/1e4
-        converged = jnp.asarray((jnp.nan_to_num(jnp.sum(column_state.V[0]))>0) & (column_state.converged==1))
+        product_prices = 0.3/1e4
+        converged = jnp.asarray((jnp.nan_to_num(jnp.sum(column_state.F))>0) & (column_state.converged==1))
         step = state.column_count - (1-converged) + 1
         state = state.replace(stream=state.stream.replace(
             flows=state.stream.flows.at[:, step].set(state.stream.flows[:, state.column_count]),
@@ -415,7 +415,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
         bot_flow_isproduct = self._is_product_stream(bot_flow, converged)
         top_flow_isproduct = self._is_product_stream(top_flow, converged)
-        feedflows = state.stream.flows[(jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), state.column_count-1]
+        feedflows = state.stream.flows[(jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), state.column_count]
         real_flows = jnp.where(converged == True, jnp.array((top_flow, bot_flow)), feedflows)
         column_cost = jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F))
         column_cost = jnp.where(jnp.abs(column_cost) > 45/8000, -45/8000/jnp.array(1000.), column_cost)

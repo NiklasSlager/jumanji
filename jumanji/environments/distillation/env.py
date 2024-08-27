@@ -398,7 +398,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
     def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array):
         product_prices = 0.8/1e4
         converged = jnp.asarray((jnp.nan_to_num(jnp.sum(column_state.F))>0) & (column_state.converged==1))
-        step = state.column_count - (1-converged) + 1
+        step = state.column_count + converged
         state = state.replace(stream=state.stream.replace(
             flows=state.stream.flows.at[:, step].set(state.stream.flows[:, state.column_count]),
             isproduct=state.stream.isproduct.at[:, step].set(state.stream.isproduct[:, state.column_count])))
@@ -409,16 +409,14 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         ) - state.stream.nr[:, state.column_count+1][0]
 
         bot_flow = jnp.nan_to_num(column_state.X[:, column_state.Nstages - 1] * (jnp.sum(column_state.F) - column_state.V[0]))
-        #bot_flow = jnp.where(bot_flow <= jnp.array([200, 300, 500]), bot_flow, -10)
         top_flow = jnp.nan_to_num(column_state.Y[:, 0] * jnp.sum(column_state.V[0]))
-        #top_flow = jnp.where(top_flow <= jnp.array([200, 300, 500]), top_flow, -10)
 
         bot_flow_isproduct = self._is_product_stream(bot_flow, converged)
         top_flow_isproduct = self._is_product_stream(top_flow, converged)
         feedflows = state.stream.flows[(jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), state.column_count]
-        real_flows = jnp.where(converged == True, jnp.array((top_flow, bot_flow)), feedflows)
-        column_cost = jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F))
-        column_cost = jnp.where(jnp.abs(column_cost) > 45/8000, -45/8000/jnp.array(1000.), column_cost)
+        real_flows = jnp.where(converged == True, jnp.array([top_flow, bot_flow]), feedflows)
+        column_cost = jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F), -45/8000/2000)
+        column_cost = jnp.where(jnp.abs(column_cost) > 45/8000/2000, -45/8000/jnp.array(2000.), column_cost)
         feed_loc = jnp.max(jnp.where(column_state.F>0, jnp.arange(len(column_state.V)), 0))
         stream_table = state.stream.replace(
             flows=state.stream.flows.at[

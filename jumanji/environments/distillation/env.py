@@ -392,7 +392,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
 
     def _is_product_stream(self, mole_flow: chex.Array, converged: chex.Scalar):
-        return ((jnp.max(mole_flow / jnp.sum(mole_flow)) > 0.95) | (jnp.sum(mole_flow) < 10)) & (converged == True) & (jnp.sum(mole_flow > 0))
+        return ((jnp.max(mole_flow / jnp.sum(mole_flow)) > 0.95) | (jnp.sum(mole_flow) < 10)) & (converged == True) 
 
 
     def _stream_table_update(self, state: State, column_state: ColumnState, action: chex.Array):
@@ -415,7 +415,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         top_flow_isproduct = self._is_product_stream(top_flow, converged)
         feedflows = state.stream.flows[(jnp.int32(jnp.min(indices)), jnp.int32(jnp.max(indices))), state.column_count]
         real_flows = jnp.where(converged == True, jnp.array([top_flow, bot_flow]), feedflows)
-        column_cost = jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F), -75/8000/2000)
+        column_cost = jnp.nan_to_num(-column_state.TAC / jnp.sum(column_state.F), nan=-75/8000/2000)
         column_cost = jnp.where(jnp.abs(column_cost) > 75/8000/2000, -75/8000/jnp.array(2000.), column_cost)
         feed_loc = jnp.max(jnp.where(column_state.F>0, jnp.arange(len(column_state.V)), 0))
         stream_table = state.stream.replace(

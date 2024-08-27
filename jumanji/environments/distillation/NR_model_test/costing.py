@@ -110,5 +110,5 @@ def operational_cost(state: State):
 
 def tac(state: State):
     depreciation = jnp.array(5., dtype=float)  #years
-    op_hr = 1000
+    op_hr = 8000
     return state.replace(TAC=(installed_cost(state)/(depreciation * op_hr) + operational_cost(state)))

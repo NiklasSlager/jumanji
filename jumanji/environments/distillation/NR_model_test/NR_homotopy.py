@@ -268,7 +268,7 @@ def inside_simulation(state, nstages, feedstage, pressure, feed, z, distillate, 
     state = state.replace(
         converged= jnp.asarray((state.NR_residuals < state.Nstages * (2 * jnp.sum(jnp.where(state.z > 0, 1, 0)) + 1) * jnp.sum(state.F) * 1e-9) &
                                (state.NR_iterations < 100)))
-    state = state.replace(TAC=jnp.where(state.converged==1, state.TAC, 45/8000))
+    state = state.replace(TAC=jnp.where(state.converged==1, state.TAC, 75/8000))
     '''
     state = state.replace(
         converged= jnp.asarray((state.BP_residuals < 0.1) &

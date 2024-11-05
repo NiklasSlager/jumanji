@@ -6,7 +6,7 @@ from hydra import compose, initialize
 
 warnings.filterwarnings("ignore")
 
-env = "distillation"  
+env = "distillation"
 agent = "a2c"  # @param ['random', 'a2c']
 
 

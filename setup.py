@@ -42,7 +42,7 @@ setup(
     author_email="clement.bonnet16@gmail.com",
     description="A diverse suite of scalable reinforcement learning environments in JAX",
     license="Apache 2.0",
-    url="https://github.com/instadeepai/jumanji/",
+    url="https://github.com/NiklasSlager/jumanji/",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     keywords="reinforcement-learning python jax",

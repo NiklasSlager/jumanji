@@ -3,6 +3,7 @@ import os
 import warnings
 from jumanji.training.train import train
 from hydra import compose, initialize
+import requests
 
 warnings.filterwarnings("ignore")
 

@@ -5,3 +5,4 @@ optax>=0.1.4
 rlax>=0.1.4
 tensorboardX==2.5.1
 tqdm>=4.64.1
+jax[cuda]>=0.2.26

@@ -63,9 +63,6 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep[Observation]]:
         """Resets the environment.
 
-        Args:
-            key: random key used to sample the snake and fruit positions.
-
         Returns:
              state: `State` object corresponding to the new state of the environment.
              timestep: `TimeStep` object corresponding to the first timestep returned by the
@@ -299,35 +296,14 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
     @cached_property
     def action_spec(self) -> specs.DiscreteArray:
-        """Returns the action spec. 4 actions: [0,1,2,3] -> [Up, Right, Down, Left].
+        """Returns the action spec. 4 actions: [stages, reflux, distillate feed stage]
 
-        Returns:
-            action_spec: a `specs.DiscreteArray` spec.
-        """
-        continuous_spec = specs.BoundedArray(shape=(5,), dtype=float, minimum=-1, maximum=1,
-                                             name="action_continuous")
         discrete_spec = specs.MultiDiscreteArray(
             num_values=jnp.array([150] * 4, jnp.int32),
             dtype=jnp.int32,
             name="action_discrete")
         return discrete_spec
-
-    def _continuous_action_to_column_spec(self, action) -> ColumnInputSpecification:
-        """All actions are assumed to be bounded between -1 and 1, and we then translate these into
-        the relevant values for the ColumnInputSpecification."""
-
-        n_stages = jnp.round(jnp.interp(action[0], jnp.array([-1, 1]), jnp.array(self._stage_bounds)) + 0.5)
-        reflux_ratio = jnp.interp(action[1], jnp.array([-1, 1]), jnp.array(self._reflux_bounds))
-        distillate = jnp.interp(action[2], jnp.array([-1, 1]), jnp.array(self._distillate_bounds))
-        pressure = jnp.interp(action[3], jnp.array([-1, 1]), jnp.array(self._pressure_bounds))
-        column_spec = ColumnInputSpecification(
-            n_stages=n_stages[0],
-            reflux_ratio=reflux_ratio[0],
-            distillate=distillate[0],
-            pressure=pressure[0]
-        )
-
-        return column_spec
+        
 
     def _action_to_column_spec(self, action: chex.Array):
         action_N, action_RR, action_D, action_F = action
@@ -350,13 +326,6 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
         )
 
     def _state_to_observation(self, state: State) -> Observation:
-        '''
-        grid = jnp.concatenate(jax.tree_util.tree_map(
-                lambda x: x[..., None], [state.Nstages, state.CD, state.RD, state.TAC]),
-            axis=-1,
-            dtype=float,
-        )
-        '''
         
         flows = jnp.sum(state.stream.flows[:, state.column_count]*state.action_mask_stream[:, state.column_count][:, None], axis=0)
 

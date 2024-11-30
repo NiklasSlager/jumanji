@@ -296,7 +296,7 @@ class Distillation(Environment[State, specs.DiscreteArray, Observation]):
 
     @cached_property
     def action_spec(self) -> specs.DiscreteArray:
-        """Returns the action spec. 4 actions: [stages, reflux, distillate feed stage]
+        """Returns the action spec. 4 actions: [stages, reflux, distillate feed stage]"""
 
         discrete_spec = specs.MultiDiscreteArray(
             num_values=jnp.array([150] * 4, jnp.int32),

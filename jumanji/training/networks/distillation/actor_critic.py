@@ -177,10 +177,10 @@ class DistillationTorsoInvariant(hk.Module):
                 query=embeddings, key=embeddings, value=embeddings
             )  # (B, N, H)
 
-        # Apply pooling (sum pooling for permutation invariance)
-        pooled_embeddings = jnp.sum(embeddings, axis=1)  # Sum over agent dimension (N)
+        # Retain shape (B, N, H) by applying pooling independently on the feature dimension
+        pooled_embeddings = jnp.sum(embeddings, axis=-1, keepdims=True)  # Sum over the feature dimension (H)
 
-        return pooled_embeddings  # (B, H)
+        return pooled_embeddings  # (B, N, 1)
         
 def make_critic_network(
     time_limit: int,

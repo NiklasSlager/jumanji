@@ -119,7 +119,64 @@ class DistillationTorso(hk.Module):
             )
         return embeddings  # (B, N, H)
 
+class DistillationTorsoInvariant(hk.Module):
+    def __init__(
+        self,
+        transformer_num_blocks: int,
+        transformer_num_heads: int,
+        transformer_key_size: int,
+        transformer_mlp_units: Sequence[int],
+        env_time_limit: int,
+        name: Optional[str] = None,
+    ):
+        super().__init__(name=name)
+        self.transformer_num_blocks = transformer_num_blocks
+        self.transformer_num_heads = transformer_num_heads
+        self.transformer_key_size = transformer_key_size
+        self.transformer_mlp_units = transformer_mlp_units
+        self.model_size = transformer_num_heads * transformer_key_size
+        self.env_time_limit = env_time_limit
 
+    def __call__(self, observation: Observation) -> chex.Array:
+        # Shape names:
+        # B: batch size
+        # N: number of agents
+        # O: observation size
+        # H: hidden/embedding size
+        # (B, N, O)
+        num_agents = 4
+        obs = observation.grid
+        agents_view = jnp.tile(obs, num_agents).reshape(obs.shape[0], num_agents, obs.shape[-1])  # (B, N, W * H)
+
+        percent_done = observation.step_count / self.env_time_limit
+        step = jnp.repeat(percent_done[:, None], num_agents, axis=-1)[..., None]
+
+        # Join step count and agent view to embed both
+        # (B, N, O + 1)
+        observation = jnp.concatenate((agents_view, step), axis=-1)
+        # (B, N, O + 1) -> (B, N, H)
+        embeddings = hk.Linear(self.model_size)(observation)
+
+        # Process each agent embedding through the transformer
+        for block_id in range(self.transformer_num_blocks):
+            transformer_block = TransformerBlock(
+                num_heads=self.transformer_num_heads,
+                key_size=self.transformer_key_size,
+                mlp_units=self.transformer_mlp_units,
+                w_init_scale=2 / self.transformer_num_blocks,
+                model_size=self.model_size,
+                name=f"self_attention_block_{block_id}",
+            )
+            embeddings = transformer_block(
+                query=embeddings, key=embeddings, value=embeddings
+            )
+        
+        # Apply pooling to ensure permutation invariance
+        # Example: using sum pooling
+        pooled_embeddings = jnp.sum(embeddings, axis=1)  # Sum over the agent dimension (N)
+
+        return pooled_embeddings  # (B, H)
+        
 def make_critic_network(
     time_limit: int,
     transformer_num_blocks: int,

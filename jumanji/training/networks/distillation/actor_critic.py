@@ -143,21 +143,27 @@ class DistillationTorsoInvariant(hk.Module):
         # N: number of agents
         # O: observation size
         # H: hidden/embedding size
-        # (B, N, O)
-        num_agents = 4
-        obs = observation.grid
-        agents_view = jnp.tile(obs, num_agents).reshape(obs.shape[0], num_agents, obs.shape[-1])  # (B, N, W * H)
+        
+        # Extract observation and ensure correct shape
+        obs = observation.grid  # Assuming (B, O)
+        batch_size = obs.shape[0]
+        num_agents = 4  # Fixed number of agents (could be dynamic in your implementation)
+        
+        # Tile observation for agents
+        agents_view = jnp.tile(obs[:, None, :], (1, num_agents, 1))  # (B, N, O)
 
-        percent_done = observation.step_count / self.env_time_limit
-        step = jnp.repeat(percent_done[:, None], num_agents, axis=-1)[..., None]
+        # Add step-based feature
+        percent_done = observation.step_count / self.env_time_limit  # (B,)
+        step = jnp.expand_dims(percent_done, axis=-1)  # (B, 1)
+        step = jnp.tile(step[:, None, :], (1, num_agents, 1))  # (B, N, 1)
 
-        # Join step count and agent view to embed both
-        # (B, N, O + 1)
-        observation = jnp.concatenate((agents_view, step), axis=-1)
-        # (B, N, O + 1) -> (B, N, H)
-        embeddings = hk.Linear(self.model_size)(observation)
+        # Concatenate step with agent views
+        observation = jnp.concatenate((agents_view, step), axis=-1)  # (B, N, O + 1)
 
-        # Process each agent embedding through the transformer
+        # Embed inputs
+        embeddings = hk.Linear(self.model_size)(observation)  # (B, N, H)
+
+        # Transformer processing
         for block_id in range(self.transformer_num_blocks):
             transformer_block = TransformerBlock(
                 num_heads=self.transformer_num_heads,
@@ -169,11 +175,10 @@ class DistillationTorsoInvariant(hk.Module):
             )
             embeddings = transformer_block(
                 query=embeddings, key=embeddings, value=embeddings
-            )
-        
-        # Apply pooling to ensure permutation invariance
-        # Example: using sum pooling
-        pooled_embeddings = jnp.sum(embeddings, axis=1)  # Sum over the agent dimension (N)
+            )  # (B, N, H)
+
+        # Apply pooling (sum pooling for permutation invariance)
+        pooled_embeddings = jnp.sum(embeddings, axis=1)  # Sum over agent dimension (N)
 
         return pooled_embeddings  # (B, H)
         

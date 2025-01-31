@@ -4,7 +4,7 @@
 The original repository, Jumanji, provides a diverse suit of scalable RL enviornments. This fork builds upon the original work to illustrate its use for scientific purposes, specificly for process synthesis.
 
 ## Fork Modifications
-## #What's New
+### What's New
 Jumanji/Environments: distillation
 Jumanji/Training/networks: distillation
 

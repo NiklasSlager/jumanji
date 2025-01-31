@@ -5,11 +5,11 @@ The original repository, Jumanji, provides a diverse suit of scalable RL enviorn
 
 ## Fork Modifications
 ### What's New
--Jumanji/Environments: distillation
+-jumanji/environments: distillation
 
--Jumanji/Training/networks: distillation
+-jumanji/training/networks: distillation
 
-## installation
+## Installation
 ```bash
 pip install git+https://github.com/NiklasSlager/jumanji.git
 ```

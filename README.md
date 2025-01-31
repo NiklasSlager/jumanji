@@ -5,7 +5,7 @@ The original repository, Jumanji, provides a diverse suit of scalable RL enviorn
 
 ## Fork Modifications
 ### What's New
-Jumanji/Environments: distillation
+Jumanji/Environments: distillation.
 Jumanji/Training/networks: distillation
 
 ## installation

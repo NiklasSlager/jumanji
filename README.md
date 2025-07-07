@@ -11,7 +11,7 @@ The original repository, Jumanji, provides a diverse suit of scalable RL enviorn
 
 ## Installation
 ```bash
-pip install git+https://github.com/NiklasSlager/jumanji.git
+pip install --quiet -U "jumanji[train] @ git+https://github.com/NiklasSlager/jumanji.git
 ```
 
 
